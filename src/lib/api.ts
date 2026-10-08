@@ -54,7 +54,13 @@ const defaultWheelConfig: WheelConfig = {
   ],
 };
 function resolveBackendUrl() {
-  const fallback = import.meta.env.DEV ? 'http://localhost:3001' : window.location.origin;
+  if (!import.meta.env.DEV) {
+    return window.location.hostname === 'moon-face.com'
+      ? 'https://www.moon-face.com'
+      : window.location.origin;
+  }
+
+  const fallback = 'http://localhost:3001';
   const configured = import.meta.env.VITE_BACKEND_URL?.trim();
   if (!configured) return fallback;
 
