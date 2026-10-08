@@ -28,7 +28,11 @@ const cartSessionRetryIntervalMs = 5 * 60 * 1000;
 const cartSessionWriteTimes = new Map();
 const recentErrorLogs = new Map();
 const errorLogCooldownMs = 60_000;
-const allowedOrigins = new Set((process.env.CORS_ORIGIN || 'http://localhost:5173,http://127.0.0.1:5173').split(',').map((origin) => origin.trim()));
+const allowedOrigins = new Set([
+  ...(process.env.CORS_ORIGIN || 'http://localhost:5173,http://127.0.0.1:5173').split(',').map((origin) => origin.trim()),
+  'https://moon-face.com',
+  'https://www.moon-face.com',
+]);
 const frontendOrigin = new URL(process.env.FRONTEND_URL || [...allowedOrigins][0]).origin;
 let vapidConfigured = Boolean(VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY && process.env.VAPID_SUBJECT);
 const oneSignalConfigured = Boolean(ONESIGNAL_APP_ID && ONESIGNAL_REST_API_KEY);
