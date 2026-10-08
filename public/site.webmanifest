@@ -1,0 +1,17 @@
+{
+  "name": "Moon Face",
+  "short_name": "Moon Face",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f5f4ed",
+  "theme_color": "#563C2E",
+    "icons": [ 
+      { 
+        "src": "/media/favicon.svg?v=4",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
