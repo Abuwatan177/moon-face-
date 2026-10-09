@@ -303,6 +303,7 @@ export async function permanentlyDeleteArchivedProduct(productId: number) {
   const cleanupResults = await Promise.allSettled(unusedMedia.map(deleteStoredMedia));
   if (cleanupResults.some((result) => result.status === 'rejected')) {
     console.error('Product was deleted, but one or more media files could not be removed.');
+    throw new Error('حُذف المنتج من قاعدة البيانات، لكن تعذر حذف بعض صوره من التخزين.');
   }
 }
 

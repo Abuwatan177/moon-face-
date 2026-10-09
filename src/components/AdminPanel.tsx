@@ -133,8 +133,8 @@ export default function AdminPanel({ products, onSave, siteContent, onSaveSiteCo
     try {
       await permanentlyDeleteArchivedProduct(product.id);
       setArchivedProducts((current) => current.filter((item) => item.id !== product.id));
-    } catch {
-      setSaveError('تعذر حذف المنتج نهائياً.');
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'تعذر حذف المنتج نهائياً.');
     }
   };
 
@@ -159,7 +159,9 @@ const save = async (productsToSave?: Product[]) => {
       await onSave(productsToSave || draft);
     } catch (error) {
       console.error('تعذر حفظ المنتجات محليًا', error);
-      setSaveError('تعذر الحفظ في هذا المتصفح. حاول مرة أخرى.');
+      setSaveError(error instanceof Error && error.message.startsWith('تم حفظ')
+        ? error.message
+        : 'تعذر الحفظ في قاعدة البيانات. لم يتم تأكيد التغيير؛ حاول مرة أخرى.');
       throw error;
     } finally {
       savingProductsRef.current = false;
@@ -177,7 +179,9 @@ const save = async (productsToSave?: Product[]) => {
       setContentSaved(true);
     } catch (error) {
       console.error('تعذر حفظ محتوى الموقع محليًا', error);
-      setSaveError('تعذر الحفظ في هذا المتصفح. حاول مرة أخرى.');
+      setSaveError(error instanceof Error && error.message.startsWith('تم حفظ')
+        ? error.message
+        : 'تعذر الحفظ في قاعدة البيانات. لم يتم تأكيد التغيير؛ حاول مرة أخرى.');
       return;
     } finally {
       setContentSaving(false);
@@ -426,6 +430,18 @@ function ProductsTab({ draft, productTypes, update, onDraftChange, onSave, savin
     }
   };
 
+  const deleteProductPermanently = async (product: Product) => {
+    if (saving || !window.confirm(`سيتم حذف ${product.nameAr || product.name} نهائياً من قاعدة البيانات وحذف صوره غير المستخدمة. لا يمكن التراجع. هل تريد المتابعة؟`)) return;
+    const nextProducts = draft.filter((item) => item.id !== product.id);
+    try {
+      await onSave(nextProducts);
+      onDraftChange(nextProducts);
+      await permanentlyDeleteArchivedProduct(product.id);
+    } catch (error) {
+      onError(error instanceof Error ? error.message : 'تعذر حذف المنتج نهائياً.');
+    }
+  };
+
   return <>
     <div className="grid grid-cols-2 gap-2 mb-4">
       <button type="button" onClick={() => setProductSection('add')} className={`py-3 rounded-xl font-bold ${productSection === 'add' ? 'bg-[#3B2A22] text-white' : 'bg-white'}`}>+ إضافة منتج</button>
@@ -487,6 +503,7 @@ function ProductsTab({ draft, productTypes, update, onDraftChange, onSave, savin
             <button type="button" disabled={index === 0} onClick={() => reorderProducts(index, index - 1)} aria-label="تحريك المنتج للأعلى" className="rounded-md p-2 text-charcoal-600 hover:bg-moon-face-100 disabled:opacity-30"><ChevronUp size={18} /></button>
             <button type="button" disabled={index === draft.length - 1} onClick={() => reorderProducts(index, index + 1)} aria-label="تحريك المنتج للأسفل" className="rounded-md p-2 text-charcoal-600 hover:bg-moon-face-100 disabled:opacity-30"><ChevronDown size={18} /></button>
             <button type="button" disabled={saving} onClick={() => void deleteProduct(product)} aria-label={`أرشفة المنتج ${product.nameAr || product.name}`} title="أرشفة المنتج" className="rounded-md p-2 text-amber-700 hover:bg-amber-50 disabled:opacity-40"><Archive size={18} /></button>
+            <button type="button" disabled={saving} onClick={() => void deleteProductPermanently(product)} aria-label={`حذف المنتج نهائياً ${product.nameAr || product.name}`} title="حذف نهائي من قاعدة البيانات" className="rounded-md p-2 text-red-700 hover:bg-red-50 disabled:opacity-40"><Trash2 size={18} /></button>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-2"><input className="field" value={product.name} onChange={(e) => update(index, { name: e.target.value })} placeholder="اسم المنتج" /><input className="field" value={product.nameAr} onChange={(e) => update(index, { nameAr: e.target.value })} placeholder="الاسم بالعربي" /><input className="field" value={product.category} onChange={(e) => update(index, { category: e.target.value })} placeholder="التصنيف" /><input className="field" type="number" value={product.price || ''} onChange={(e) => update(index, { price: Number(e.target.value) })} placeholder="السعر بعد الخصم" /><input className="field" type="number" value={product.originalPrice || ''} onChange={(e) => update(index, { originalPrice: Number(e.target.value) })} placeholder="السعر قبل الخصم (اختياري)" /><select className="field" value={product.badge} onChange={(e) => update(index, { badge: e.target.value })} aria-label={`تصنيف ${product.name}`}>

@@ -45,8 +45,8 @@ export default function Collections({ collections = [], onSelectCollection }: { 
               transition={{ delay: 0.2 + i * 0.15 }}
               className="group relative aspect-[3/4] rounded-3xl overflow-hidden cursor-pointer shadow-lg"
             >
-              {/* Image */}
-              <StoredMedia type="image" source={col.image} alt={`${col.title} ${t('collections')}`} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" />
+              <StoredMedia type="image" source={col.image} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full scale-110 object-cover blur-xl opacity-70" />
+              <StoredMedia type="image" source={col.image} alt={`${col.title} ${t('collections')}`} className="absolute inset-0 h-full w-full object-contain" />
 
               {/* طبقة تظليل ممتدة للكرت كاملاً لحماية النصوص البيضاء */}
               <div className="absolute inset-0 bg-gradient-to-t from-charcoal-950/90 via-transparent to-black/60 transition-opacity duration-300" />

@@ -3,7 +3,7 @@ import EditorialHero from './components/EditorialHero';
 import Collections from './components/Collections';
 import Benefits from './components/Benefits';
 import Footer from './components/Footer';
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { ShoppingBag } from 'lucide-react';
 import ProductShowcase from './components/ProductShowcase';
@@ -13,9 +13,8 @@ import LiveSocialProof from './components/LiveSocialProof';
 import ScrollToTopButton from './components/ScrollToTopButton';
 import PullToRefresh from './components/PullToRefresh';
 import SpecialOffers from './components/SpecialOffers';
-import CartDrawer, { type CartItem } from './components/CartDrawer';
 import SpinWheel from './components/SpinWheel';
-import AccountPanel from './components/AccountPanel';
+import type { CartItem } from './components/CartDrawer';
 import { useAuth } from './context/AuthContext';
 import { defaultProducts, type Product } from './data/products';
 import { clearAbandonedCartSession, deleteStoredMedia, loadArchivedProducts, loadProducts, loadSiteContent, saveProducts as persistProducts, saveSiteContent as persistSiteContent, trackCartSession } from './lib/api';
@@ -24,6 +23,9 @@ import { normalizeProductType, useLanguage } from './i18n';
 import { playStoreSound } from './utils/storeSounds';
 
 export type WishlistItem = Product & { selectedColor: string };
+
+const CartDrawer = lazy(() => import('./components/CartDrawer'));
+const AccountPanel = lazy(() => import('./components/AccountPanel'));
 
 function isRetiredBundledMedia(source: string) {
   try {
@@ -227,9 +229,20 @@ export default function App() {
   const hadCartItems = useRef(cart.length > 0);
   const [cartSessionId] = useState(readCartSessionId);
   const [cartOpen, setCartOpen] = useState(false);
+  const [cartDrawerLoaded, setCartDrawerLoaded] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [accountPanelLoaded, setAccountPanelLoaded] = useState(false);
   const [wishlist, setWishlist] = useState<WishlistItem[]>(restoreWishlist);
   const [siteContent, setSiteContent] = useState<SiteContent>(() => mergeSiteContent(readStored<Partial<SiteContent>>('moon-face-site-content', {})));
+
+  const openCartDrawer = () => {
+    setCartDrawerLoaded(true);
+    setCartOpen(true);
+  };
+  const openAccountPanel = () => {
+    setAccountPanelLoaded(true);
+    setAccountOpen(true);
+  };
 
   useEffect(() => {
     writeStored('moon-face-cart', cart);
@@ -330,19 +343,27 @@ export default function App() {
     const ordered = normalizeProducts(next).map((product, index) => ({ ...product, displayOrder: index }));
     const previousMedia = collectStoredMedia(products);
     const saved = await persistProducts(ordered);
-    const archivedProducts = await loadArchivedProducts();
-    const retainedMedia = collectStoredMedia([...ordered, ...archivedProducts]);
-    await Promise.all([...previousMedia].filter((url) => !retainedMedia.has(url)).map(deleteStoredMedia));
     const savedOrdered = normalizeProducts(saved).sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
     setProducts(savedOrdered);
+    try {
+      const archivedProducts = await loadArchivedProducts();
+      const retainedMedia = collectStoredMedia([...ordered, ...archivedProducts]);
+      const cleanupResults = await Promise.allSettled([...previousMedia].filter((url) => !retainedMedia.has(url)).map(deleteStoredMedia));
+      if (cleanupResults.some((result) => result.status === 'rejected')) throw new Error();
+    } catch {
+      throw new Error('تم حفظ المنتجات في قاعدة البيانات، لكن تعذر حذف بعض الصور القديمة من التخزين.');
+    }
   };
   const saveSiteContent = async (next: SiteContent) => {
     const merged = mergeSiteContent(next);
     await persistSiteContent(merged);
+    setSiteContent(merged);
     const previousMedia = collectStoredMedia(siteContent);
     const retainedMedia = collectStoredMedia(merged);
-    await Promise.all([...previousMedia].filter((url) => !retainedMedia.has(url)).map(deleteStoredMedia));
-    setSiteContent(merged);
+    const cleanupResults = await Promise.allSettled([...previousMedia].filter((url) => !retainedMedia.has(url)).map(deleteStoredMedia));
+    if (cleanupResults.some((result) => result.status === 'rejected')) {
+      throw new Error('تم حفظ محتوى المتجر في قاعدة البيانات، لكن تعذر حذف بعض الوسائط القديمة من التخزين.');
+    }
   };
   const toggleWishlist = (product: Product, selectedColor: string) => {
     const isAdding = !wishlist.some((item) => item.id === product.id);
@@ -365,8 +386,8 @@ export default function App() {
       <Navbar
         products={products}
         storeLogo={siteContent.storeLogo}
-        onCartOpen={() => setCartOpen(true)}
-        onAccountOpen={() => setAccountOpen(true)}
+        onCartOpen={openCartDrawer}
+        onAccountOpen={openAccountPanel}
         isSignedIn={Boolean(user)}
         isGuest={isGuest}
         cartCount={cart.reduce((sum, item) => sum + item.quantity, 0)}
@@ -382,15 +403,15 @@ export default function App() {
       <LiveSocialProof products={products} paused={cartOpen || accountOpen} />
       {Object.values(siteContent.story).some((value) => typeof value === 'string' ? value.trim() : Array.isArray(value) && value.length > 0) && <Benefits content={siteContent.story} />}
       <Footer policies={siteContent.policies} />
-      <button onClick={() => setCartOpen(true)} className="fixed bottom-5 right-5 z-40 w-14 h-14 rounded-full bg-[#563C2E] text-white shadow-xl flex items-center justify-center hover:scale-110 hover:bg-moon-face-800 transition-all duration-300" aria-label={t('openCart')}>
+      <button onClick={openCartDrawer} className="fixed bottom-5 right-5 z-40 w-14 h-14 rounded-full bg-[#563C2E] text-white shadow-xl flex items-center justify-center hover:scale-110 hover:bg-moon-face-800 transition-all duration-300" aria-label={t('openCart')}>
         <ShoppingBag className="w-6 h-6" />
         <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-[#f6f3e8] bg-[#a56c4f] px-1 text-xs font-bold leading-none text-white shadow-sm">{cart.reduce((sum, item) => sum + item.quantity, 0)}</span>
       </button>
-      <CartDrawer open={cartOpen} items={cart} sessionId={cartSessionId} whatsappNumber={siteContent.whatsappNumber} onClose={() => setCartOpen(false)} onChange={changeQuantity} onClear={() => setCart([])} />
+      {cartDrawerLoaded && <Suspense fallback={null}><CartDrawer open={cartOpen} items={cart} sessionId={cartSessionId} whatsappNumber={siteContent.whatsappNumber} onClose={() => setCartOpen(false)} onChange={changeQuantity} onClear={() => setCart([])} /></Suspense>}
       <SpinWheel />
       <ScrollToTopButton />
       <PullToRefresh />
-      <AccountPanel open={accountOpen} products={products} siteContent={siteContent} onSaveProducts={saveProducts} onSaveSiteContent={saveSiteContent} onClose={() => setAccountOpen(false)} />
+      {accountPanelLoaded && <Suspense fallback={null}><AccountPanel open={accountOpen} products={products} siteContent={siteContent} onSaveProducts={saveProducts} onSaveSiteContent={saveSiteContent} onClose={() => setAccountOpen(false)} /></Suspense>}
       </div>
     </div>
   );
