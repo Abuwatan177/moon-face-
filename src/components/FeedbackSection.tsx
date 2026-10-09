@@ -1,5 +1,6 @@
-import { useState, type FormEvent } from 'react';
+import { useState, type FormEvent, type MouseEventHandler } from 'react';
 import { Send } from 'lucide-react';
+import { FaWhatsapp } from 'react-icons/fa6';
 import { useLanguage } from '../i18n';
 import { saveStoreFeedback } from '../lib/api';
 
@@ -17,6 +18,12 @@ export default function FeedbackSection({ recipient }: { recipient: string }) {
     { value: 'note', label: t('feedbackNote') },
     { value: 'idea', label: t('feedbackIdea') },
   ];
+  const createFeedbackBody = () => [
+    `${t('feedbackType')}: ${t(`feedback${kind === 'opinion' ? 'Opinion' : kind === 'note' ? 'Note' : 'Idea'}`)}`,
+    `${t('feedbackName')}: ${name.trim() || '-'}`,
+    `${t('feedbackReplyEmail')}: ${replyEmail.trim() || '-'}`,
+    `${t('feedbackMessage')}:\n${message.trim()}`,
+  ].join('\n\n');
 
   const submitFeedback = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -31,14 +38,29 @@ export default function FeedbackSection({ recipient }: { recipient: string }) {
       setNotice(t('feedbackSaveError'));
       return;
     }
-    const body = [
-      `${t('feedbackType')}: ${t(`feedback${kind === 'opinion' ? 'Opinion' : kind === 'note' ? 'Note' : 'Idea'}`)}`,
-      `${t('feedbackName')}: ${name.trim() || '-'}`,
-      `${t('feedbackReplyEmail')}: ${replyEmail.trim() || '-'}`,
-      `${t('feedbackMessage')}:\n${message.trim()}`,
-    ].join('\n\n');
+    const body = createFeedbackBody();
     window.location.href = `mailto:${recipient.trim()}?subject=${encodeURIComponent(`Moon Face | ${t('feedbackTitle')}`)}&body=${encodeURIComponent(body)}`;
     setNotice(t('feedbackEmailOpening'));
+  };
+
+  const sendFeedbackByWhatsApp: MouseEventHandler<HTMLButtonElement> = async (event) => {
+    if (!event.currentTarget.form?.reportValidity()) return;
+    const whatsappWindow = window.open('about:blank', '_blank');
+    if (!whatsappWindow) {
+      setNotice(t('feedbackPopupBlocked'));
+      return;
+    }
+    whatsappWindow.opener = null;
+    try {
+      await saveStoreFeedback({ kind, name, replyEmail, message });
+    } catch (error) {
+      console.error('Could not save store feedback:', error);
+      whatsappWindow.close();
+      setNotice(t('feedbackSaveError'));
+      return;
+    }
+    whatsappWindow.location.href = `https://wa.me/970599789591?text=${encodeURIComponent(createFeedbackBody())}`;
+    setNotice(t('feedbackWhatsAppOpening'));
   };
 
   return (
@@ -60,6 +82,9 @@ export default function FeedbackSection({ recipient }: { recipient: string }) {
           <div className="flex flex-wrap items-center gap-4">
             <button type="submit" className="inline-flex items-center gap-2 rounded-lg bg-[#514332] px-5 py-3 font-bold text-white transition-colors hover:bg-[#6B704B]">
               <Send size={17} /> {t('feedbackSubmit')}
+            </button>
+            <button type="button" onClick={sendFeedbackByWhatsApp} className="inline-flex items-center gap-2 rounded-lg bg-[#20b95a] px-5 py-3 font-bold text-white transition-colors hover:bg-[#159947]">
+              <FaWhatsapp size={19} /> {t('feedbackWhatsApp')}
             </button>
             {notice && <p role="status" className="text-sm text-moon-face-800">{notice}</p>}
           </div>
