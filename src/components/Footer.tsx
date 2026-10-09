@@ -2,14 +2,13 @@ import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
 import { useLanguage } from '../i18n';
-import { FaInstagram, FaSnapchat, FaTiktok, FaWhatsapp } from 'react-icons/fa6';
+import { FaInstagram, FaTiktok, FaWhatsapp } from 'react-icons/fa6';
 import type { SiteContent } from '../data/siteContent';
 
 const socialLinks = [
-  { label: 'Instagram', href: 'https://www.instagram.com/', Icon: FaInstagram },
-  { label: 'Snapchat', href: 'https://www.snapchat.com/', Icon: FaSnapchat },
-  { label: 'WhatsApp', href: 'https://www.whatsapp.com/', Icon: FaWhatsapp },
-  { label: 'TikTok', href: 'https://www.tiktok.com/', Icon: FaTiktok },
+  { label: 'Instagram', href: 'https://www.instagram.com/moonface.ps?exln=MWFiaTYyMTF6OWVrcA==', Icon: FaInstagram },
+  { label: 'WhatsApp', href: 'https://wa.me/970599789591', Icon: FaWhatsapp },
+  { label: 'TikTok', href: 'https://www.tiktok.com/@moonface.ps?_r=1&_t=ZS-9AQ1drAIJnj', Icon: FaTiktok },
 ];
 
 export default function Footer({ policies }: { policies: SiteContent['policies'] }) {

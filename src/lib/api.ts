@@ -577,16 +577,19 @@ export async function subscribeToCartReminders(sessionId: string) {
     });
 
     if (!response.ok) {
-      throw new Error(`Subscription failed (${response.status}).`);
+      const result = await response.json().catch(() => ({})) as { error?: string };
+      throw new Error(result.error || `Subscription failed (${response.status}).`);
     }
 
     localStorage.setItem(`moon-face-cart-reminders:${sessionId}`, 'true');
     invalidateReadCache(`cart-reminder-status:${sessionId}`);
   } catch (err: unknown) {
-    if (isBackendUnavailableError(err)) return;
     const errorMessage = err instanceof Error ? err.message : 'Unknown error';
     console.error('Error in subscribeToCartReminders:', errorMessage);
-    throw new Error('Unable to setup cart reminders.');
+    if (isBackendUnavailableError(err)) {
+      throw new Error('تعذر الاتصال بخدمة المتجر. تحقق من الاتصال وحاول مجدداً.');
+    }
+    throw err instanceof Error ? err : new Error(errorMessage);
   }
 }export async function loadCartReminderStatus(sessionId: string) {
   return cachedRead(`cart-reminder-status:${sessionId}`, async () => {

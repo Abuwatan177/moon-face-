@@ -303,6 +303,9 @@ app.get('/api/cart-reminders/status', async (request, response, next) => {
 });
 
 app.post('/api/onesignal-subscriptions', async (request, response, next) => {
+  if (!oneSignalConfigured) {
+    return response.status(503).json({ error: 'خدمة OneSignal غير مهيأة على الخادم. تحقق من إعدادات الإشعارات.' });
+  }
   try {
     const identity = await getIdentity(request);
     const subscriptionId = String(request.body?.subscriptionId || '');
@@ -318,7 +321,8 @@ app.post('/api/onesignal-subscriptions', async (request, response, next) => {
     if (error) throw error;
     response.sendStatus(204);
   } catch (error) {
-    next(error);
+    logLimitedError('onesignal-subscription', 'Could not save OneSignal subscription:', error.message);
+    response.status(503).json({ error: 'تعذر تسجيل اشتراك الإشعارات على الخادم. تحقق من اتصال قاعدة البيانات ثم أعد المحاولة.' });
   }
 });
 
