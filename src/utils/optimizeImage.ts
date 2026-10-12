@@ -1,5 +1,4 @@
-const MAX_IMAGE_DIMENSION = 2560;
-const WEBP_QUALITY = 0.92;
+const WEBP_QUALITY = 0.86;
 
 export function optimizeImage(file: File): Promise<Blob> {
   if (!file.type.startsWith('image/') || file.type === 'image/svg+xml' || file.type === 'image/gif') {
@@ -10,10 +9,9 @@ export function optimizeImage(file: File): Promise<Blob> {
     const image = new Image();
     const objectUrl = URL.createObjectURL(file);
     image.onload = () => {
-      const scale = Math.min(1, MAX_IMAGE_DIMENSION / Math.max(image.naturalWidth, image.naturalHeight));
       const canvas = document.createElement('canvas');
-      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
-      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+      canvas.width = image.naturalWidth;
+      canvas.height = image.naturalHeight;
       const context = canvas.getContext('2d');
       if (!context) {
         URL.revokeObjectURL(objectUrl);
