@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { toWebpStorageUrl } from '../utils/media';
 
 export type PageMetadata = {
   title: string;
@@ -28,7 +29,7 @@ function setMetaContent(kind: 'name' | 'property', key: string, content: string)
 
 function absoluteImageUrl(source: string) {
   try {
-    const url = new URL(source, window.location.origin);
+    const url = new URL(toWebpStorageUrl(source), window.location.origin);
     return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : new URL('/media/favicon.svg', window.location.origin).href;
   } catch {
     return new URL('/media/favicon.svg', window.location.origin).href;

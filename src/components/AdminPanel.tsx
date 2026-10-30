@@ -4,6 +4,7 @@ import { Archive, Check, ChevronDown, ChevronUp, Download, Eye, GripVertical, Im
 import type { Product } from '../data/products';
 import type { SiteContent } from '../data/siteContent';
 import { getProductColorHex } from '../utils/productColors';
+import { toWebpStorageUrl } from '../utils/media';
 import { optimizeImage } from '../utils/optimizeImage';
 import { useAuth } from '../context/AuthContext';
 import { loadArchivedProducts as loadArchivedProductsFromApi, loadLoyaltyConfig, loadWheelConfig, permanentlyDeleteArchivedProduct, saveLoyaltyConfig, saveWheelConfig, saveUploadedMedia, sendAdminBroadcastNotification, type LoyaltyCampaign, type LoyaltyConfig, type WheelConfig, type WheelSlice } from '../lib/api';
@@ -746,7 +747,7 @@ function ContentTab({ draft, products, update, onSave, readMediaFiles, onError, 
           return <div key={type} className="space-y-3 border-t border-moon-face-200 pt-3">
             <div className="flex items-center justify-between gap-3"><span className="font-semibold">{type}</span><button type="button" onClick={() => update({ ...draft, productTypes: draft.productTypes.filter((item) => item !== type) })} aria-label={`حذف نوع ${type}`} className="grid size-8 place-items-center rounded-full text-red-600 hover:bg-red-50"><X size={16} /></button></div>
             <div className="relative aspect-[1.55/1] max-w-sm overflow-hidden rounded-lg bg-moon-face-100">
-              {previewImage ? <img src={previewImage} alt={`معاينة غلاف ${type}`} className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: `${cover.positionX}% ${cover.positionY}%`, transform: `scale(${cover.zoom / 100})` }} /> : <div className="grid h-full place-items-center text-sm text-charcoal-500">لا توجد صورة لهذا النوع</div>}
+              {previewImage ? <img src={toWebpStorageUrl(previewImage)} alt={`معاينة غلاف ${type}`} className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: `${cover.positionX}% ${cover.positionY}%`, transform: `scale(${cover.zoom / 100})` }} /> : <div className="grid h-full place-items-center text-sm text-charcoal-500">لا توجد صورة لهذا النوع</div>}
               <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-3 pt-8 font-bold text-white">{type}</span>
             </div>
             <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-moon-face-800"><ImagePlus size={16} /> رفع صورة غلاف

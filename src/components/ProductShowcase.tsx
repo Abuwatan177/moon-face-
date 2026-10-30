@@ -15,6 +15,7 @@ import { getProductColorStyle } from '../utils/productColors';
 import { readRecentlyViewedProductIds, trackRecentlyViewedProduct } from '../utils/recentlyViewed';
 import { usePageMetadata } from '../hooks/usePageMetadata';
 import { getProductShareUrl } from '../lib/api';
+import { toWebpStorageUrl } from '../utils/media';
 
 const hasAvailableVariant = (product: Product) => product.colors.some((color) => color.available);
 
@@ -32,15 +33,7 @@ function mediaForColor(product: Product, colorName: string): NonNullable<Product
     ...(product.media || []),
   ].filter((item, index, media) => item.url && media.findIndex((candidate) => candidate.type === item.type && candidate.url === item.url) === index);
 
-  return rawMedia.map((item) => {
-    if (item.type === 'image' && item.url.includes('/storage/v1/object/public/store-media/')) {
-      return {
-        ...item,
-        url: item.url.replace(/\.(?:jpe?g|png|gif|svg|avif|tiff?|bmp|heic|heif)(?=([?#]|$))/i, '.webp'),
-      };
-    }
-    return item;
-  });
+  return rawMedia;
 }
 
 const productsPerPage = 10;
@@ -168,7 +161,7 @@ export default function ProductShowcase({ products: initialProducts, productType
   usePageMetadata({
     title: selectedProductForMeta ? `${metaProductName} | Moon Face` : t('seoStoreTitle'),
     description: metaDescription,
-    image: selectedProductForMeta?.image || '/media/favicon.svg',
+    image: toWebpStorageUrl(selectedProductForMeta?.image || '/media/favicon.svg'),
     url: productShareUrl(selectedProductForMeta?.id ?? null),
     type: selectedProductForMeta ? 'product' : 'website',
   });
@@ -179,7 +172,7 @@ export default function ProductShowcase({ products: initialProducts, productType
     value: type,
     label: translateProductType(type, language),
     count: cloudProducts.filter((product) => product.productType?.trim() === type).length,
-    image: productTypeCovers[type]?.image || cloudProducts.find((product) => product.productType?.trim() === type)?.image,
+    image: toWebpStorageUrl(productTypeCovers[type]?.image || cloudProducts.find((product) => product.productType?.trim() === type)?.image || ''),
     positionX: productTypeCovers[type]?.positionX ?? 50,
     positionY: productTypeCovers[type]?.positionY ?? 50,
     zoom: productTypeCovers[type]?.zoom ?? 100,

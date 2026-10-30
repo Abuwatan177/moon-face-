@@ -5,6 +5,7 @@ import { Search, ShoppingBag, Heart, X, ArrowRight, CircleUserRound } from 'luci
 import type { Product as StoreProduct } from '../data/products';
 import type { WishlistItem } from '../App';
 import { translateProductColor, useLanguage } from '../i18n';
+import { toWebpStorageUrl } from '../utils/media';
 
 type SearchResult = {
   id: number;
@@ -160,7 +161,7 @@ export default function Navbar({ products, storeLogo, onCartOpen, onAccountOpen,
 
           </div>
           <a href="#home" aria-label={t('home')} className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 grid h-12 w-[74px] place-items-center max-[420px]:h-10 max-[420px]:w-[62px] max-[360px]:h-8 max-[360px]:w-12 sm:h-16 sm:w-[99px] lg:h-[70px] lg:w-[109px]">
-            <img src={storeLogo} alt="Moon Face" className="h-full w-full object-contain" />
+            <img src={toWebpStorageUrl(storeLogo)} alt="Moon Face" className="h-full w-full object-contain" />
           </a>
           <div dir={language === 'en' ? 'ltr' : 'rtl'} className="ml-auto flex items-center gap-1 sm:gap-1.5 max-[420px]:gap-0">
 

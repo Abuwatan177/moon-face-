@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { loadLocalMedia } from '../lib/localMedia';
+import { toWebpStorageUrl } from '../utils/media';
 
 export default function useStoredMedia(source: string) {
   const [resolvedSource, setResolvedSource] = useState('');
@@ -8,7 +9,7 @@ export default function useStoredMedia(source: string) {
     let active = true;
     let objectUrl = '';
     if (!source.startsWith('local-media:')) {
-      setResolvedSource(source);
+      setResolvedSource(toWebpStorageUrl(source));
       return () => { active = false; };
     }
 
