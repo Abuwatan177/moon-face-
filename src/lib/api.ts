@@ -1087,6 +1087,9 @@ export async function deleteProductComment(id: string) {
 
 export async function saveUploadedMedia(blob: Blob, filename: string, tryLosslessCompression = false) {
   if (blob.size > 100 * 1024 * 1024) throw new Error('حجم الملف يتجاوز 100MB. اختر ملفاً أصغر.');
+  if (blob.type.startsWith('image/') && blob.type !== 'image/webp') {
+    throw new Error('يجب تحويل الصورة إلى WebP قبل حفظها.');
+  }
   if (supabase) {
     const extension = blob.type === 'image/webp' ? 'webp' : filename.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin';
     const path = `${crypto.randomUUID()}.${extension}`;

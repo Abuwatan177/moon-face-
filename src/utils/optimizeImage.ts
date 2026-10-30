@@ -1,10 +1,6 @@
-const WEBP_QUALITY = 0.86;
+const WEBP_QUALITY = 1;
 
 export function optimizeImage(file: File): Promise<Blob> {
-  if (!file.type.startsWith('image/') || file.type === 'image/svg+xml' || file.type === 'image/gif') {
-    return Promise.resolve(file);
-  }
-
   return new Promise((resolve, reject) => {
     const image = new Image();
     const objectUrl = URL.createObjectURL(file);
@@ -15,14 +11,18 @@ export function optimizeImage(file: File): Promise<Blob> {
       const context = canvas.getContext('2d');
       if (!context) {
         URL.revokeObjectURL(objectUrl);
-        resolve(file);
+        reject(new Error('Could not create image canvas'));
         return;
       }
 
       context.drawImage(image, 0, 0, canvas.width, canvas.height);
       canvas.toBlob((blob) => {
         URL.revokeObjectURL(objectUrl);
-        resolve(blob && blob.size < file.size ? blob : file);
+        if (!blob || blob.type !== 'image/webp') {
+          reject(new Error('Could not encode image as WebP'));
+          return;
+        }
+        resolve(blob);
       }, 'image/webp', WEBP_QUALITY);
     };
     image.onerror = () => {

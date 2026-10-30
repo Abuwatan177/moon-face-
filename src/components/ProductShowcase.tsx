@@ -25,13 +25,26 @@ function mediaForColor(product: Product, colorName: string): NonNullable<Product
     : product.images.filter((item) => item.color === colorName).map((item) => item.img);
   const imageUrls = colorImages.length ? colorImages : color?.image ? [color.image] : [];
   const colorMedia = color?.media || [];
-  return [
+
+  const rawMedia = [
     ...imageUrls.map((url) => ({ type: 'image' as const, url })),
     ...colorMedia,
     ...(product.media || []),
   ].filter((item, index, media) => item.url && media.findIndex((candidate) => candidate.type === item.type && candidate.url === item.url) === index);
+
+  return rawMedia.map((item) => {
+    if (item.type === 'image' && item.url.includes('/storage/v1/object/public/store-media/')) {
+      return {
+        ...item,
+        url: item.url.replace(/\.(?:jpe?g|png|gif|svg|avif|tiff?|bmp|heic|heif)(?=([?#]|$))/i, '.webp'),
+      };
+    }
+    return item;
+  });
 }
+
 const productsPerPage = 10;
+
 const compareProducts = (first: Product, second: Product) => {
   const stockOrder = Number(hasAvailableVariant(second)) - Number(hasAvailableVariant(first));
   if (stockOrder) return stockOrder;
@@ -51,8 +64,7 @@ function productShareUrl(productId: number | null) {
   if (productId !== null) url.searchParams.set('product', String(productId));
   return url.href;
 }
-
-// تم استخدام 'any' لتجاوز خطأ التايب سكربت المزعج
+  // تم استخدام 'any' لتجاوز خطأ التايب سكربت المزعج
 export function ProductCard({ product, index, onAdd, liked, onToggleWishlist, selected, onSelect, onRequireAuth, animateOnView = true, variant = 'store' }: { product: Product; index: number; onAdd: (product: Product, color: string) => void; liked: boolean; onToggleWishlist: (product: Product, color: string) => void; selected: boolean; onSelect: (productId: number) => void; onRequireAuth: () => void; animateOnView?: boolean; variant?: 'store' | 'offer' }) {  const { language, t } = useLanguage();
   const isOffer = variant === 'offer';
   const cardRef = useRef<HTMLDivElement>(null);
