@@ -578,7 +578,7 @@ app.post('/api/admin/notifications', async (request, response, next) => {
         headers: { Authorization: `Key ${ONESIGNAL_REST_API_KEY}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           app_id: ONESIGNAL_APP_ID,
-          included_segments: ['Subscribed Users'],
+included_segments: ['Total Subscriptions'],
           headings: { en: title, ar: title },
           contents: { en: message, ar: message },
           url: frontendOrigin,
