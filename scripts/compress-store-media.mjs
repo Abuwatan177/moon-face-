@@ -14,10 +14,9 @@ export async function compressImageBuffer(input) {
     return { buffer: null, reason: 'unsupported' };
   }
 
-  const output = sharp(input, { failOn: 'none' }).keepMetadata();
-  if (metadata.format === 'jpeg') output.jpeg({ quality: 88, mozjpeg: true });
-  if (metadata.format === 'png') output.png({ compressionLevel: 9, adaptiveFiltering: true, effort: 10 });
-  if (metadata.format === 'webp') output.webp({ quality: 88, effort: 6 });
+const output = sharp(input, { failOnError: false })
+  .keepMetadata()
+  .webp({ quality: 88, effort: 6 }); // تم إجبار جميع الصور على التحول إلى webp هنا
 
   const { data, info } = await output.toBuffer({ resolveWithObject: true });
   if (info.width !== metadata.width || info.height !== metadata.height) {
