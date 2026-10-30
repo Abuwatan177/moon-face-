@@ -140,6 +140,12 @@ const mergeSiteContent = (value: Partial<SiteContent> | null | undefined): SiteC
     ? value.productTypes.filter((type): type is string => typeof type === 'string' && type.trim().length > 0)
       .filter((type) => normalizeProductType(type) !== 'hijabs')
     : [];
+  const productTypeCovers = Object.fromEntries(Object.entries(value?.productTypeCovers || {}).map(([type, cover]) => [type, {
+    image: typeof cover?.image === 'string' && !isRetiredBundledMedia(cover.image) ? cover.image : '',
+    positionX: Number.isFinite(cover?.positionX) ? Math.min(100, Math.max(0, cover.positionX)) : 50,
+    positionY: Number.isFinite(cover?.positionY) ? Math.min(100, Math.max(0, cover.positionY)) : 50,
+    zoom: Number.isFinite(cover?.zoom) ? Math.min(180, Math.max(100, cover.zoom)) : 100,
+  }]));
   const savedHeroMedia = Array.isArray(value?.hero?.media)
     ? value.hero.media.filter((media) => (media.type === 'image' || media.type === 'video') && Boolean(media.url) && !isRetiredBundledMedia(media.url))
     : [];
@@ -169,6 +175,7 @@ const mergeSiteContent = (value: Partial<SiteContent> | null | undefined): SiteC
     offersEnabled: value?.offersEnabledConfigured === true ? value.offersEnabled === true : defaultSiteContent.offersEnabled,
     offersEnabledConfigured: value?.offersEnabledConfigured === true,
     productTypes: productTypes.length ? productTypes : defaultSiteContent.productTypes,
+    productTypeCovers,
     storeLogo: typeof value?.storeLogo === 'string' && !isRetiredBundledMedia(value.storeLogo) ? value.storeLogo : defaultSiteContent.storeLogo,
     whatsappNumber: typeof value?.whatsappNumber === 'string' ? value.whatsappNumber : defaultSiteContent.whatsappNumber,
     feedbackEmail: typeof value?.feedbackEmail === 'string' ? value.feedbackEmail.trim() : defaultSiteContent.feedbackEmail,
@@ -396,7 +403,7 @@ export default function App() {
       />
       <EditorialHero key={language} content={siteContent.hero} featuredImage={products[0]?.image} language={language} />
       {siteContent.offersEnabled && <SpecialOffers products={products} onAdd={addToCart} wishlist={wishlist} onToggleWishlist={toggleWishlist} onRequireAuth={() => setAccountOpen(true)} />}
-      <ProductShowcase products={products} productTypes={siteContent.productTypes} tutorials={siteContent.tutorials} onAdd={addToCart} wishlist={wishlist} onToggleWishlist={toggleWishlist} onRequireAuth={() => setAccountOpen(true)} />
+      <ProductShowcase products={products} productTypes={siteContent.productTypes} productTypeCovers={siteContent.productTypeCovers} tutorials={siteContent.tutorials} onAdd={addToCart} wishlist={wishlist} onToggleWishlist={toggleWishlist} onRequireAuth={() => setAccountOpen(true)} />
       {siteContent.collections.length > 0 && <Collections collections={siteContent.collections} onSelectCollection={() => document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' })} />}
       <ReelsSection entries={siteContent.reels.entries} products={products} onRequireAuth={() => setAccountOpen(true)} />
       <FeedbackSection recipient={siteContent.feedbackEmail} />

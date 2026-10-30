@@ -652,6 +652,10 @@ function ContentTab({ draft, products, update, onSave, readMediaFiles, onError, 
   const setTutorials = (change: Partial<SiteContent['tutorials']>) => update({ ...draft, tutorialsConfigured: true, tutorials: { ...draft.tutorials, ...change } });
   const setReels = (change: Partial<SiteContent['reels']>) => update({ ...draft, reelsConfigured: true, reels: { ...draft.reels, ...change } });
   const setPolicies = (change: Partial<SiteContent['policies']>) => update({ ...draft, policies: { ...draft.policies, ...change } });
+  const setTypeCover = (type: string, change: Partial<SiteContent['productTypeCovers'][string]>) => {
+    const cover = draft.productTypeCovers[type] || { image: '', positionX: 50, positionY: 50, zoom: 100 };
+    update({ ...draft, productTypeCovers: { ...draft.productTypeCovers, [type]: { ...cover, ...change } } });
+  };
   const addProductType = () => {
     const type = newProductType.trim();
     if (!type || draft.productTypes.includes(type)) return;
@@ -735,8 +739,25 @@ function ContentTab({ draft, products, update, onSave, readMediaFiles, onError, 
         <input className="field min-w-0" value={newProductType} onChange={(event) => setNewProductType(event.target.value)} onKeyDown={(event) => event.key === 'Enter' && addProductType()} placeholder="اسم النوع" aria-label="اسم النوع الجديد" />
         <button type="button" onClick={addProductType} disabled={!newProductType.trim() || draft.productTypes.includes(newProductType.trim())} className="shrink-0 rounded-md bg-[#563C2E] px-4 text-sm font-semibold text-white disabled:opacity-40">إضافة</button>
       </div>
-      <div className="divide-y divide-moon-face-200">
-        {draft.productTypes.map((type) => <div key={type} className="flex items-center justify-between gap-3 py-2"><span>{type}</span><button type="button" onClick={() => update({ ...draft, productTypes: draft.productTypes.filter((item) => item !== type) })} aria-label={`حذف نوع ${type}`} className="grid size-8 place-items-center rounded-full text-red-600 hover:bg-red-50"><X size={16} /></button></div>)}
+      <div className="space-y-4">
+        {draft.productTypes.map((type) => {
+          const cover = draft.productTypeCovers[type] || { image: '', positionX: 50, positionY: 50, zoom: 100 };
+          const previewImage = cover.image || products.find((product) => product.productType?.trim() === type)?.image;
+          return <div key={type} className="space-y-3 border-t border-moon-face-200 pt-3">
+            <div className="flex items-center justify-between gap-3"><span className="font-semibold">{type}</span><button type="button" onClick={() => update({ ...draft, productTypes: draft.productTypes.filter((item) => item !== type) })} aria-label={`حذف نوع ${type}`} className="grid size-8 place-items-center rounded-full text-red-600 hover:bg-red-50"><X size={16} /></button></div>
+            <div className="relative aspect-[1.55/1] max-w-sm overflow-hidden rounded-lg bg-moon-face-100">
+              {previewImage ? <img src={previewImage} alt={`معاينة غلاف ${type}`} className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: `${cover.positionX}% ${cover.positionY}%`, transform: `scale(${cover.zoom / 100})` }} /> : <div className="grid h-full place-items-center text-sm text-charcoal-500">لا توجد صورة لهذا النوع</div>}
+              <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-3 pt-8 font-bold text-white">{type}</span>
+            </div>
+            <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-moon-face-800"><ImagePlus size={16} /> رفع صورة غلاف
+              <input type="file" accept="image/*" className="hidden" onChange={(event) => readImage(event.target.files?.[0], (image) => setTypeCover(type, { image }), onError)} />
+            </label>
+            {cover.image && <button type="button" onClick={() => setTypeCover(type, { image: '' })} className="text-xs font-semibold text-charcoal-600">استخدام صورة أول منتج من هذا النوع</button>}
+            <label className="block text-xs font-medium">الموضع الأفقي<input type="range" min="0" max="100" value={cover.positionX} onChange={(event) => setTypeCover(type, { positionX: Number(event.target.value) })} className="mt-1 block w-full accent-[#6B704B]" /></label>
+            <label className="block text-xs font-medium">الموضع العمودي<input type="range" min="0" max="100" value={cover.positionY} onChange={(event) => setTypeCover(type, { positionY: Number(event.target.value) })} className="mt-1 block w-full accent-[#6B704B]" /></label>
+            <label className="block text-xs font-medium">التكبير · {cover.zoom}%<input type="range" min="100" max="180" value={cover.zoom} onChange={(event) => setTypeCover(type, { zoom: Number(event.target.value) })} className="mt-1 block w-full accent-[#6B704B]" /></label>
+          </div>;
+        })}
         {!draft.productTypes.length && <p className="py-3 text-sm text-charcoal-500">لم تضف أنواعًا بعد.</p>}
       </div>
     </div>

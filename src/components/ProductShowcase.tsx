@@ -138,7 +138,7 @@ export function ProductCard({ product, index, onAdd, liked, onToggleWishlist, se
   );
 }
 
-export default function ProductShowcase({ products: initialProducts, productTypes, tutorials, onAdd, wishlist, onToggleWishlist, onRequireAuth }: { products: Product[]; productTypes: string[]; tutorials: SiteContent['tutorials']; onAdd: (product: Product, color: string) => void; wishlist: WishlistItem[]; onToggleWishlist: (product: Product, color: string) => void; onRequireAuth: () => void }) {
+export default function ProductShowcase({ products: initialProducts, productTypes, productTypeCovers, tutorials, onAdd, wishlist, onToggleWishlist, onRequireAuth }: { products: Product[]; productTypes: string[]; productTypeCovers: SiteContent['productTypeCovers']; tutorials: SiteContent['tutorials']; onAdd: (product: Product, color: string) => void; wishlist: WishlistItem[]; onToggleWishlist: (product: Product, color: string) => void; onRequireAuth: () => void }) {
   const [activeType, setActiveType] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedProductId, setSelectedProductId] = useState<number | null>(readProductIdFromUrl);
@@ -167,7 +167,10 @@ export default function ProductShowcase({ products: initialProducts, productType
     value: type,
     label: translateProductType(type, language),
     count: cloudProducts.filter((product) => product.productType?.trim() === type).length,
-    image: cloudProducts.find((product) => product.productType?.trim() === type)?.image,
+    image: productTypeCovers[type]?.image || cloudProducts.find((product) => product.productType?.trim() === type)?.image,
+    positionX: productTypeCovers[type]?.positionX ?? 50,
+    positionY: productTypeCovers[type]?.positionY ?? 50,
+    zoom: productTypeCovers[type]?.zoom ?? 100,
   }));
   const scrollTypeRail = (direction: -1 | 1) => {
     const rail = typeRailRef.current;
@@ -223,8 +226,7 @@ export default function ProductShowcase({ products: initialProducts, productType
           <nav ref={typeRailRef} aria-label={t('productTypeFilter')} dir={language === 'en' ? 'ltr' : 'rtl'} className="filter-rail snap-x snap-mandatory items-start">
           {typeOptions.map((type) => <button key={type.value} type="button" onClick={() => { setActiveType(type.value); setCurrentPage(1); setSelectedProductId(null); document.getElementById('products')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }} aria-pressed={activeType === type.value} className={`group relative isolate aspect-[1.55/1] w-[18rem] shrink-0 snap-start overflow-hidden rounded-xl border text-start shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg max-[380px]:w-[78vw] sm:w-80 ${activeType === type.value ? 'border-[#68704B] ring-2 ring-[#68704B]/35' : 'border-[#a56c4f]/35'}`}>
             {type.image ? <>
-              <img src={type.image} alt="" aria-hidden="true" loading="lazy" decoding="async" className="absolute inset-0 z-0 h-full w-full scale-110 object-cover blur-xl opacity-75" />
-              <img src={type.image} alt="" loading="lazy" decoding="async" className="absolute inset-0 z-10 h-full w-full object-contain" />
+              <img src={type.image} alt="" loading="lazy" decoding="async" className="absolute inset-0 z-10 h-full w-full object-cover" style={{ objectPosition: `${type.positionX}% ${type.positionY}%`, transform: `scale(${type.zoom / 100})` }} />
             </> : <div className="absolute inset-0 bg-[#514332]" />}
             <span aria-hidden="true" className="absolute inset-0 z-20 bg-gradient-to-t from-[#2E241D]/90 via-[#2E241D]/25 to-[#2E241D]/5" />
             <span aria-hidden="true" className="absolute inset-0 z-30" style={{ background: 'linear-gradient(125deg, rgba(255,255,255,.52) 0%, rgba(255,255,255,.1) 27%, transparent 43%, rgba(255,255,255,.16) 70%, transparent 100%)' }} />

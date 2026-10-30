@@ -2,6 +2,7 @@ export type SiteContent = {
   offersEnabled: boolean;
   offersEnabledConfigured: boolean;
   productTypes: string[];
+  productTypeCovers: Record<string, { image: string; positionX: number; positionY: number; zoom: number }>;
   storeLogo: string;
   whatsappNumber: string;
   feedbackEmail: string;
@@ -48,6 +49,7 @@ export const defaultSiteContent: SiteContent = {
   offersEnabled: true,
   offersEnabledConfigured: false,
   productTypes: ['مودال', 'شيفون', 'قطن'],
+  productTypeCovers: {},
   storeLogo: '/media/favicon.svg',
   whatsappNumber: '',
   feedbackEmail: '',
