@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { Fragment, useEffect, useState, useRef } from 'react';
 import { AnimatePresence, motion, useInView } from 'framer-motion';
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Heart, Share2, ShoppingBag } from 'lucide-react';
 import AnimatedActionButton from './AnimatedActionButton';
@@ -143,7 +143,7 @@ export function ProductCard({ product, index, onAdd, liked, onToggleWishlist, se
   );
 }
 
-export default function ProductShowcase({ products: initialProducts, productTypes, productTypeCovers, tutorials, onAdd, wishlist, onToggleWishlist, onRequireAuth }: { products: Product[]; productTypes: string[]; productTypeCovers: SiteContent['productTypeCovers']; tutorials: SiteContent['tutorials']; onAdd: (product: Product, color: string) => void; wishlist: WishlistItem[]; onToggleWishlist: (product: Product, color: string) => void; onRequireAuth: () => void }) {
+export default function ProductShowcase({ products: initialProducts, productTypes, productTypeCovers, tutorials, collectionVideo, onAdd, wishlist, onToggleWishlist, onRequireAuth }: { products: Product[]; productTypes: string[]; productTypeCovers: SiteContent['productTypeCovers']; tutorials: SiteContent['tutorials']; collectionVideo: SiteContent['collectionVideo']; onAdd: (product: Product, color: string) => void; wishlist: WishlistItem[]; onToggleWishlist: (product: Product, color: string) => void; onRequireAuth: () => void }) {
   const [activeType, setActiveType] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedProductId, setSelectedProductId] = useState<number | null>(readProductIdFromUrl);
@@ -266,9 +266,14 @@ export default function ProductShowcase({ products: initialProducts, productType
         <main>
             <AnimatePresence mode="wait">
               <motion.div key={`${activeType}-${activePage}`} initial={{ opacity: 0, x: language === 'ar' ? 22 : -22 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: language === 'ar' ? -22 : 22 }} transition={{ duration: 0.24, ease: 'easeOut' }} className="grid auto-rows-fr grid-cols-2 gap-x-3 gap-y-6 max-[380px]:grid-cols-1 sm:gap-x-6 sm:gap-y-12">
-                {pageProducts.map((product, index) => <div key={product.id || index} data-product-id={product.id} className="h-full">
-                  <ProductCard product={product} index={index} onAdd={onAdd} liked={wishlist.some((item) => item.id === product.id)} onToggleWishlist={onToggleWishlist} selected={selectedProductId === product.id} onSelect={setSelectedProductId} onRequireAuth={onRequireAuth} />
-                </div>)}
+                {pageProducts.map((product, index) => <Fragment key={product.id || index}>
+                  <div data-product-id={product.id} className="h-full">
+                    <ProductCard product={product} index={index} onAdd={onAdd} liked={wishlist.some((item) => item.id === product.id)} onToggleWishlist={onToggleWishlist} selected={selectedProductId === product.id} onSelect={setSelectedProductId} onRequireAuth={onRequireAuth} />
+                  </div>
+                  {index === 3 && activePage === 1 && collectionVideo.url && !collectionVideo.hidden && <article aria-label={language === 'ar' ? 'فيديو التشكيلة' : 'Collection video'} className="w-full max-w-[18rem] justify-self-center self-start overflow-hidden rounded-xl bg-[#2E241D] shadow-sm">
+                    <StoredMedia type="video" source={collectionVideo.url} alt={language === 'ar' ? 'فيديو التشكيلة' : 'Collection video'} controls muted loop className="aspect-[9/16] w-full object-cover" />
+                  </article>}
+                </Fragment>)}
                 {!visible.length && <div className="col-span-full border-y border-[#c6c9b2] py-20 text-center"><p className="font-display text-2xl text-[#716B4E]">{t('comingSoon')}</p><p className="mt-2 text-base text-[#777d6a]">{t('noProducts')}</p></div>}
               </motion.div>
             </AnimatePresence>

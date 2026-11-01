@@ -16,6 +16,7 @@ export type SiteContent = {
     title: string;
     entries: { id: string; url: string; productId: number; caption: string }[];
   };
+  collectionVideo: { url: string; hidden: boolean };
   policies: { delivery: string; exchange: string; returns: string };
   collections: {
     title: string;
@@ -63,6 +64,7 @@ export const defaultSiteContent: SiteContent = {
     title: 'الريلز',
     entries: [],
   },
+  collectionVideo: { url: '', hidden: false },
   policies: { delivery: '', exchange: '', returns: '' },
   collections: [],
   hero: {

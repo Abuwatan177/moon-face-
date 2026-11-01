@@ -15,7 +15,7 @@ const normalizeCouponCode = (code: string) => code.replace(/\s+/g, '').toUpperCa
 export default function CartDrawer({ open, items, sessionId, whatsappNumber, onClose, onChange, onClear }: { open: boolean; items: CartItem[]; sessionId: string; whatsappNumber: string; onClose: () => void; onChange: (lineId: string, delta: number) => void; onClear: () => void }) {
   const { language, t } = useLanguage();
   const { user } = useAuth();
-  const [region, setRegion] = useStateRegion();
+  const [region, setRegion] = useState<'الضفة' | 'القدس' | 'الداخل'>('الضفة');
   const [customer, setCustomer] = useState({ name: '', phone: '', address: '' });
   const [orderNotice, setOrderNotice] = useState<{ number: string; token: string } | null>(null);
   const [couponInput, setCouponInput] = useState('');
@@ -26,12 +26,18 @@ export default function CartDrawer({ open, items, sessionId, whatsappNumber, onC
   const [loyaltyConfig, setLoyaltyConfig] = useState<LoyaltyConfig>({ pointsPerCurrency: 1, currencyValuePerPoint: 0.01, campaigns: [] });
   const [pointsToRedeem, setPointsToRedeem] = useState(0);
   const [pushNotice, setPushNotice] = useState('');
-  const [pushEnabled, setPushEnabled] = useState(() => {
-    try { return localStorage.getItem(`moon-face-cart-reminders:${sessionId}`) === 'true'; }
-    catch { return false; }
-  });
+  const [pushEnabled, setPushEnabled] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
   const [pushStatusLoaded, setPushStatusLoaded] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      try {
+        const localStatus = localStorage.getItem(`moon-face-cart-reminders:${sessionId}`) === 'true';
+        setPushEnabled(localStatus);
+      } catch { /* حماية إضافية */ }
+    }
+  }, [sessionId]);
 
   useEffect(() => {
     let active = true;
@@ -42,7 +48,7 @@ export default function CartDrawer({ open, items, sessionId, whatsappNumber, onC
       try {
         if (enabled) localStorage.setItem(`moon-face-cart-reminders:${sessionId}`, 'true');
         else localStorage.removeItem(`moon-face-cart-reminders:${sessionId}`);
-      } catch { /* The backend remains the source of truth. */ }
+      } catch { /* السيرفر هو مصدر الحقيقة الافتراضي */ }
     }).catch(() => undefined).finally(() => {
       if (active) setPushStatusLoaded(true);
     });
@@ -56,7 +62,6 @@ export default function CartDrawer({ open, items, sessionId, whatsappNumber, onC
     else setLoyaltyBalance(0);
     return () => { active = false; };
   }, [user]);
-
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const discount = couponApplied ? Math.round(subtotal * couponDiscountPercent) / 100 : 0;
   const pointValue = Math.max(0.0001, loyaltyConfig.currencyValuePerPoint);
@@ -168,9 +173,4 @@ export default function CartDrawer({ open, items, sessionId, whatsappNumber, onC
       </>}
     </motion.aside>
   </>}</AnimatePresence>;
-}
-
-function useStateRegion() {
-  const [region, setRegion] = useState<keyof typeof delivery>('الضفة');
-  return [region, setRegion] as const;
 }

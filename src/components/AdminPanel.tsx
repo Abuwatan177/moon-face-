@@ -648,11 +648,28 @@ function ContentTab({ draft, products, update, onSave, readMediaFiles, onError, 
   const [newProductType, setNewProductType] = useState('');
   const [tutorialVideoUrl, setTutorialVideoUrl] = useState('');
   const [reelVideoUrl, setReelVideoUrl] = useState('');
+  const [collectionVideoUploading, setCollectionVideoUploading] = useState(false);
   const setHero = (change: Partial<SiteContent['hero']>) => update({ ...draft, hero: { ...draft.hero, ...change } });
   const setStory = (change: Partial<SiteContent['story']>) => update({ ...draft, story: { ...draft.story, ...change } });
   const setTutorials = (change: Partial<SiteContent['tutorials']>) => update({ ...draft, tutorialsConfigured: true, tutorials: { ...draft.tutorials, ...change } });
   const setReels = (change: Partial<SiteContent['reels']>) => update({ ...draft, reelsConfigured: true, reels: { ...draft.reels, ...change } });
   const setPolicies = (change: Partial<SiteContent['policies']>) => update({ ...draft, policies: { ...draft.policies, ...change } });
+  const uploadCollectionVideo = async (file: File | undefined) => {
+    if (!file) return;
+    if (!file.type.startsWith('video/')) {
+      onError('اختاري ملف فيديو صالحاً.');
+      return;
+    }
+    setCollectionVideoUploading(true);
+    try {
+      const url = await saveUploadedMedia(file, file.name);
+      update({ ...draft, collectionVideo: { ...draft.collectionVideo, url } });
+    } catch (error) {
+      onError(error instanceof Error ? error.message : 'تعذر رفع الفيديو.');
+    } finally {
+      setCollectionVideoUploading(false);
+    }
+  };
   const setTypeCover = (type: string, change: Partial<SiteContent['productTypeCovers'][string]>) => {
     const cover = draft.productTypeCovers[type] || { image: '', positionX: 50, positionY: 50, zoom: 100 };
     update({ ...draft, productTypeCovers: { ...draft.productTypeCovers, [type]: { ...cover, ...change } } });
@@ -723,6 +740,24 @@ function ContentTab({ draft, products, update, onSave, readMediaFiles, onError, 
         <textarea className="field min-h-20 resize-y" value={reel.caption} onChange={(event) => setReels({ entries: draft.reels.entries.map((item, itemIndex) => itemIndex === index ? { ...item, caption: event.target.value } : item) })} placeholder="وصف الريل" />
         <button type="button" onClick={() => setReels({ entries: draft.reels.entries.filter((_, itemIndex) => itemIndex !== index) })} className="text-sm font-semibold text-red-600">حذف الريل</button>
       </div>)}
+    </div>
+    <div className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
+      <h3 className="font-bold text-lg">فيديو داخل التشكيلة</h3>
+      <label className="block text-sm font-semibold">رابط الفيديو
+        <input type="url" dir="ltr" className="field mt-1" value={draft.collectionVideo.url} onChange={(event) => update({ ...draft, collectionVideo: { ...draft.collectionVideo, url: event.target.value } })} placeholder="MP4 أو YouTube / Vimeo / TikTok / Instagram" />
+      </label>
+      <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-moon-face-300 px-4 py-3 text-sm font-semibold text-moon-face-800 hover:bg-moon-face-100 ${collectionVideoUploading ? 'pointer-events-none opacity-60' : ''}`}>
+        <ImagePlus size={17} /> {collectionVideoUploading ? 'جارٍ رفع الفيديو...' : 'أو ارفعي فيديو من الجهاز'}
+        <input type="file" accept="video/*" className="hidden" disabled={collectionVideoUploading} onChange={(event) => { void uploadCollectionVideo(event.target.files?.[0]); event.target.value = ''; }} />
+      </label>
+      <p className="text-xs text-charcoal-500">يمكن رفع ملف فيديو حتى ١٠٠ ميغابايت، أو استخدام رابط فيديو.</p>
+      {isWebUrl(draft.collectionVideo.url) && <StoredMedia type="video" source={draft.collectionVideo.url} alt="معاينة فيديو التشكيلة" controls className="aspect-[9/16] max-h-80 w-full rounded-lg bg-[#2E241D] object-cover" />}
+      {draft.collectionVideo.url.startsWith('local-media:') && <StoredMedia type="video" source={draft.collectionVideo.url} alt="معاينة فيديو التشكيلة" controls className="aspect-[9/16] max-h-80 w-full rounded-lg bg-[#2E241D] object-cover" />}
+      {draft.collectionVideo.url.trim() && <div className="flex items-center justify-between gap-3">
+        <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={!draft.collectionVideo.hidden} onChange={(event) => update({ ...draft, collectionVideo: { ...draft.collectionVideo, hidden: !event.target.checked } })} className="size-5 accent-[#563C2E]" />إظهار الفيديو في التشكيلة</label>
+        <button type="button" onClick={() => update({ ...draft, collectionVideo: { url: '', hidden: false } })} className="flex shrink-0 items-center gap-1 text-sm font-semibold text-red-600"><Trash2 size={16} />حذف الفيديو</button>
+      </div>}
+      <p className="text-xs text-charcoal-500">يظهر الفيديو بعد أربع بطاقات منتجات في الصفحة الأولى. احفظي المحتوى لتطبيق التغيير على المتجر.</p>
     </div>
     <div className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
       <h3 className="font-bold text-lg">استقبال الآراء والملاحظات</h3>

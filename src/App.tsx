@@ -164,6 +164,9 @@ const mergeSiteContent = (value: Partial<SiteContent> | null | undefined): SiteC
     : [];
   const reelsConfigured = value?.reelsConfigured === true;
   const reelsEntries = reelsConfigured || savedReelsEntries.length ? savedReelsEntries : defaultSiteContent.reels.entries;
+  const collectionVideoUrl = typeof value?.collectionVideo?.url === 'string' && !isRetiredBundledMedia(value.collectionVideo.url)
+    ? value.collectionVideo.url.trim()
+    : '';
   const heroImage = value?.hero?.image && !isRetiredBundledMedia(value.hero.image) ? value.hero.image : defaultSiteContent.hero.image;
   const heroMedia = savedHeroMedia.length
     ? [...savedHeroMedia]
@@ -193,6 +196,10 @@ const mergeSiteContent = (value: Partial<SiteContent> | null | undefined): SiteC
       ...(value?.reels && typeof value.reels === 'object' ? value.reels : {}),
       title: value?.reels?.title || defaultSiteContent.reels.title,
       entries: reelsEntries,
+    },
+    collectionVideo: {
+      url: collectionVideoUrl,
+      hidden: value?.collectionVideo?.hidden === true,
     },
     policies: {
       ...defaultSiteContent.policies,
@@ -404,7 +411,7 @@ export default function App() {
       />
       <EditorialHero key={language} content={siteContent.hero} featuredImage={products[0]?.image} language={language} />
       {siteContent.offersEnabled && <SpecialOffers products={products} onAdd={addToCart} wishlist={wishlist} onToggleWishlist={toggleWishlist} onRequireAuth={() => setAccountOpen(true)} />}
-      <ProductShowcase products={products} productTypes={siteContent.productTypes} productTypeCovers={siteContent.productTypeCovers} tutorials={siteContent.tutorials} onAdd={addToCart} wishlist={wishlist} onToggleWishlist={toggleWishlist} onRequireAuth={() => setAccountOpen(true)} />
+      <ProductShowcase products={products} productTypes={siteContent.productTypes} productTypeCovers={siteContent.productTypeCovers} tutorials={siteContent.tutorials} collectionVideo={siteContent.collectionVideo} onAdd={addToCart} wishlist={wishlist} onToggleWishlist={toggleWishlist} onRequireAuth={() => setAccountOpen(true)} />
       {siteContent.collections.length > 0 && <Collections collections={siteContent.collections} onSelectCollection={() => document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' })} />}
       <ReelsSection entries={siteContent.reels.entries} products={products} onRequireAuth={() => setAccountOpen(true)} />
       <FeedbackSection recipient={siteContent.feedbackEmail} />
