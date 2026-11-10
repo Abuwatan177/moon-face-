@@ -468,42 +468,31 @@ export async function saveOrder(order: Record<string, any>) {
 
 export async function sendOrderToShipping(order: Record<string, any>, orderNumber: number) {
   try {
-const response = await fetch('https://casper.delivery', {
+    const response = await fetch(`/api/shipping/orders`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        jsonrpc: "2.0",
-        method: "create_order",
-        id: orderNumber,
-        params: {
-          login: "0599789591",
-          password: "123456789",
-          db: "casper",
-          customer_name: order.customer?.name || "زبون متجر مون فيس",
-          customer_mobile: order.customer?.phone || "",
-          customer_address: order.customer?.address || order.region || "عنوان الزبون",
-          customer_area: order.region || "عام",
-          customer_sub_area: "",
-          reference_id: String(orderNumber),
-          cost: order.total_total || order.total || 0,
-          order_type_id: "1",
-          note: order.product_note || "طلب من المتجر الإلكتروني",
-          paid: true,
-          delivery_fee_on_customer: false,
-          delivery_fee_on_sender: false,
-          product_note: ""
-        }
+        orderNumber: orderNumber,
+        customer: order.customer,
+        region: order.region,
+        total: order.total_total || order.total || 0,
+        items: order.items || [],
+        product_note: order.product_note || ""
       }),
     });
 
-    const resData = await response.json();
-    console.log("استجابة سيرفر كاسبر:", resData);
+    if (!response.ok) {
+      console.error("فشل إرسال الطلب للسيرفر المدمج:", await response.text());
+    } else {
+      console.log("تمت معالجة الطلب وإرساله بنجاح عبر السيرفر!");
+    }
   } catch (error) {
-    console.error("خطأ أثناء الاتصال المباشر بكاسبر:", error);
+    console.error("خطأ أثناء الاتصال بالسيرفر الداخلي:", error);
   }
 }
+
 async function backendHeaders(sessionId: string) {
   const session = supabase ? (await supabase.auth.getSession()).data.session : null;
   return {
