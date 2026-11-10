@@ -365,6 +365,83 @@ app.get('/api/shipping/orders/:orderNumber/status', async (request, response) =>
   }
 });
 
+async function sendCasperOrderToDelivery({ orderNumber, customer, region, items, total, productNote = '' }) {
+  if (!casperLogin || !casperPassword) {
+    console.warn('Casper delivery is not configured; checkout remains successful but no shipment was sent.');
+    return { sent: false, reason: 'not_configured' };
+  }
+
+  const validatedCustomer = {
+    name: String(customer?.name || '').trim(),
+    phone: String(customer?.phone || '').trim(),
+    address: String(customer?.address || '').trim(),
+  };
+
+  try {
+    await callCasper('https://casper.delivery/create_order', 'create_order', {
+      login: casperLogin,
+      password: casperPassword,
+      db: casperDatabase,
+      customer_address: validatedCustomer.address,
+      customer_mobile: validatedCustomer.phone,
+      customer_name: validatedCustomer.name,
+      customer_area: String(region || '').trim(),
+      cost: Number(total),
+      order_type_id: '1',
+      note: typeof productNote === 'string' ? productNote.slice(0, 500) : '',
+      paid: false,
+      delivery_fee_on_customer: false,
+      delivery_fee_on_sender: false,
+    });
+    return { sent: true, reason: 'ok' };
+  } catch (error) {
+    logLimitedError('casper-create-order', `Casper request failed for order ${orderNumber}:`, error.message);
+    console.error('Checkout succeeded, but Casper sync failed:', { orderNumber, message: error.message });
+    return { sent: false, reason: error.message };
+  }
+}
+
+app.post('/api/orders/checkout', async (request, response) => {
+  const body = request.body || {};
+  const orderNumber = Number(body.orderNumber);
+  const customer = body.customer || {};
+  const total = Number(body.total);
+
+  if (!Number.isSafeInteger(orderNumber) || orderNumber <= 0
+    || typeof customer.name !== 'string' || !customer.name.trim() || customer.name.length > 120
+    || typeof customer.phone !== 'string' || customer.phone.trim().length < 5 || customer.phone.length > 32
+    || typeof customer.address !== 'string' || !customer.address.trim() || customer.address.length > 500
+    || typeof body.region !== 'string' || body.region.length > 80
+    || !Number.isFinite(total) || total < 0) {
+    return response.status(400).json({ error: 'Invalid shipping order.' });
+  }
+
+  try {
+    cleanCartItems(body.items);
+  } catch {
+    return response.status(400).json({ error: 'Invalid shipping order.' });
+  }
+
+  const result = await sendCasperOrderToDelivery({
+    orderNumber,
+    customer,
+    region: body.region,
+    items: body.items,
+    total,
+    productNote: typeof body.product_note === 'string' ? body.product_note : '',
+  });
+
+  if (!result.sent) {
+    return response.status(502).json({ error: 'Casper delivery provider is unavailable.' });
+  }
+  return response.json({
+    ok: true,
+    orderNumber,
+    shippingSent: result.sent,
+    message: result.sent ? 'Order sent to Casper.' : 'Checkout succeeded; Casper sync failed and was logged.',
+  });
+});
+
 app.post('/api/shipping/orders', async (request, response) => {
   const body = request.body || {};
   const orderNumber = Number(body.orderNumber);
@@ -379,37 +456,25 @@ app.post('/api/shipping/orders', async (request, response) => {
     return response.status(400).json({ error: 'Invalid shipping order.' });
   }
 
-  if (!casperLogin || !casperPassword) {
-    return response.status(503).json({ error: 'Casper delivery is not configured.' });
-  }
-
   try {
     cleanCartItems(body.items);
   } catch {
     return response.status(400).json({ error: 'Invalid shipping order.' });
   }
 
-  try {
-    await callCasper('https://casper.delivery/create_order', 'create_order', {
-      login: casperLogin,
-      password: casperPassword,
-      db: casperDatabase,
-      customer_address: customer.address.trim(),
-      customer_mobile: customer.phone.trim(),
-      customer_name: customer.name.trim(),
-      customer_area: body.region,
-      cost: total,
-      order_type_id: '1',
-      note: typeof body.product_note === 'string' ? body.product_note.slice(0, 500) : '',
-      paid: false,
-      delivery_fee_on_customer: false,
-      delivery_fee_on_sender: false,
-    });
-    response.sendStatus(204);
-  } catch (error) {
-    logLimitedError('casper-create-order', `Casper request failed for order ${orderNumber}:`, error.message);
-    response.status(502).json({ error: 'Casper delivery provider is unavailable.' });
+  const result = await sendCasperOrderToDelivery({
+    orderNumber,
+    customer,
+    region: body.region,
+    items: body.items,
+    total,
+    productNote: typeof body.product_note === 'string' ? body.product_note : '',
+  });
+
+  if (!result.sent) {
+    return response.status(502).json({ error: 'Casper delivery provider is unavailable.' });
   }
+  response.sendStatus(204);
 });
 
 app.post('/api/push-subscriptions', async (request, response, next) => {

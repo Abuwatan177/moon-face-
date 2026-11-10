@@ -467,29 +467,22 @@ export async function saveOrder(order: Record<string, any>) {
 }
 
 export async function sendOrderToShipping(order: Record<string, any>, orderNumber: number) {
-  try {
-    const response = await fetch(`/api/shipping/orders`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        orderNumber: orderNumber,
-        customer: order.customer,
-        region: order.region,
-        total: order.total_total || order.total || 0,
-        items: order.items || [],
-        product_note: order.product_note || ""
-      }),
-    });
+  const response = await fetch(`${backendUrl}/api/shipping/orders`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      orderNumber,
+      customer: order.customer,
+      region: order.region,
+      total: order.total,
+      items: order.items,
+      product_note: order.product_note || '',
+    }),
+  });
 
-    if (!response.ok) {
-      console.error("فشل إرسال الطلب للسيرفر المدمج:", await response.text());
-    } else {
-      console.log("تمت معالجة الطلب وإرساله بنجاح عبر السيرفر!");
-    }
-  } catch (error) {
-    console.error("خطأ أثناء الاتصال بالسيرفر الداخلي:", error);
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '');
+    throw new Error(`Casper shipping request failed (${response.status})${errorText ? `: ${errorText}` : ''}.`);
   }
 }
 

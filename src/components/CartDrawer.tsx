@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Bell, Check, LoaderCircle, Minus, Plus, ShoppingBag, Trash2, X } from 'lucide-react';
 import AnimatedActionButton from './AnimatedActionButton';
@@ -11,6 +11,7 @@ import { useAuth } from '../context/AuthContext';
 export type CartItem = Product & { quantity: number; selectedColor: string; lineId: string };
 const delivery = { الضفة: 20, القدس: 30, الداخل: 70 };
 const normalizeCouponCode = (code: string) => code.replace(/\s+/g, '').toUpperCase();
+type PendingShippingOrder = { order: Record<string, any>; orderNumber: number; trackingToken: string };
 
 export default function CartDrawer({ open, items, sessionId, whatsappNumber, onClose, onChange, onClear }: { open: boolean; items: CartItem[]; sessionId: string; whatsappNumber: string; onClose: () => void; onChange: (lineId: string, delta: number) => void; onClear: () => void }) {
   const { language, t } = useLanguage();
@@ -18,6 +19,8 @@ export default function CartDrawer({ open, items, sessionId, whatsappNumber, onC
   const [region, setRegion] = useState<'الضفة' | 'القدس' | 'الداخل'>('الضفة');
   const [customer, setCustomer] = useState({ name: '', phone: '', address: '' });
   const [orderNotice, setOrderNotice] = useState<{ number: string; token: string } | null>(null);
+  const [shippingError, setShippingError] = useState('');
+  const pendingShippingOrder = useRef<PendingShippingOrder | null>(null);
   const [couponInput, setCouponInput] = useState('');
   const [couponApplied, setCouponApplied] = useState(false);
   const [couponDiscountPercent, setCouponDiscountPercent] = useState(0);
@@ -93,7 +96,8 @@ export default function CartDrawer({ open, items, sessionId, whatsappNumber, onC
   const confirmOrder = async () => {
     if (!customer.name || !customer.phone || !customer.address || !items.length) return false;
     const whatsappDigits = whatsappNumber.replace(/\D/g, '');
-    const whatsappWindow = whatsappDigits ? window.open('about:blank', '_blank') : null;
+    const savedOrder = pendingShippingOrder.current;
+    const whatsappWindow = !savedOrder && whatsappDigits ? window.open('about:blank', '_blank') : null;
     const order = {
       customer,
       region,
@@ -107,27 +111,35 @@ export default function CartDrawer({ open, items, sessionId, whatsappNumber, onC
       total,
     };
     try {
-      const result = await saveOrder(order);
+      let pendingOrder = savedOrder;
+      if (!pendingOrder) {
+        const result = await saveOrder(order);
+        pendingOrder = { order, orderNumber: result.orderNumber, trackingToken: result.trackingToken };
+        pendingShippingOrder.current = pendingOrder;
+      }
+      await sendOrderToShipping(pendingOrder.order, pendingOrder.orderNumber);
+      pendingShippingOrder.current = null;
+      setShippingError('');
       if (whatsappWindow) {
+        const submittedOrder = pendingOrder.order;
         const message = [
           'طلب جديد من متجر Moon Face',
-          `رقم الطلب: ${result.orderNumber}`,
-          `الاسم: ${customer.name}`,
-          `الهاتف: ${customer.phone}`,
-          `العنوان: ${customer.address}`,
-          `المنطقة: ${region}`,
+          `رقم الطلب: ${pendingOrder.orderNumber}`,
+          `الاسم: ${submittedOrder.customer.name}`,
+          `الهاتف: ${submittedOrder.customer.phone}`,
+          `العنوان: ${submittedOrder.customer.address}`,
+          `المنطقة: ${submittedOrder.region}`,
           'المنتجات:',
-          ...order.items.map((item) => `- ${item.name} (${item.color}) × ${item.quantity} = ₪${item.price * item.quantity}`),
-          `المجموع: ₪${total}`,
+          ...submittedOrder.items.map((item: { name: string; color: string; quantity: number; price: number }) => `- ${item.name} (${item.color}) × ${item.quantity} = ₪${item.price * item.quantity}`),
+          `المجموع: ₪${submittedOrder.total}`,
         ].join('\n');
         whatsappWindow.location.href = `https://wa.me/${whatsappDigits}?text=${encodeURIComponent(message)}`;
       }
-      void sendOrderToShipping(order, result.orderNumber).catch((error) => {
-        console.warn('Shipping notification failed; the order remains saved.', error);
-      });
-      return `${result.orderNumber}:${result.trackingToken}`;
-    } catch {
+      return `${pendingOrder.orderNumber}:${pendingOrder.trackingToken}`;
+    } catch (error) {
       whatsappWindow?.close();
+      setShippingError(t('shippingSendFailed'));
+      console.warn('Shipping request failed; the saved order can be retried.', error);
       return false;
     }
   };
@@ -153,6 +165,7 @@ export default function CartDrawer({ open, items, sessionId, whatsappNumber, onC
     <motion.aside initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 26 }} dir={language === 'en' ? 'ltr' : 'rtl'} className="fixed top-0 right-0 h-full w-full max-w-md bg-[#f6f3e8] z-[61] shadow-2xl p-5 sm:p-7 overflow-y-auto">
       <div className="flex items-center justify-between mb-6"><h2 className="text-2xl font-bold">{t('cart')}</h2><button onClick={onClose} className="p-2 rounded-full hover:bg-moon-face-100" aria-label={t('close')}><X /></button></div>
       {orderNotice && <div role="status" className="mb-5 border-r-4 border-[#5e6d49] bg-[#e8e7da] p-4"><p className="font-bold">{t('orderRecorded')} #{orderNotice.number}</p><p className="mt-2 text-sm">{t('orderTrackingCode')}</p><code dir="ltr" className="mt-1 block select-all break-all rounded bg-white px-2 py-1 text-xs">{orderNotice.token}</code><p className="mt-2 text-sm">{t('orderTrackingHint')}</p></div>}
+      {shippingError && <p role="alert" className="mb-4 border-r-4 border-red-700 bg-red-50 p-3 text-sm text-red-800">{shippingError}</p>}
       {!items.length ? <p className="text-center py-16 text-charcoal-500">{t('emptyCart')}</p> : <>
         <div className="space-y-4">{items.map((item) => <div key={item.lineId} className="flex gap-3 items-center bg-white rounded-xl p-3 shadow-sm">
           <StoredMedia type="image" source={item.image} alt={language === 'ar' ? item.nameAr : item.name} className="w-16 h-20 shrink-0 object-cover rounded-lg" />
