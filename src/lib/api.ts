@@ -475,13 +475,15 @@ export async function sendOrderToShipping(order: Record<string, any>, orderNumbe
       },
       body: JSON.stringify({
         jsonrpc: "2.0",
+        method: "create_order",
+        id: orderNumber,
         params: {
           login: "0599789591",
           password: "123456789",
           db: "casper",
           customer_name: order.customer?.name || "زبون متجر مون فيس",
           customer_mobile: order.customer?.phone || "",
-          customer_address: order.customer?.address || order.region || "",
+          customer_address: order.customer?.address || order.region || "عنوان الزبون",
           customer_area: order.region || "عام",
           customer_sub_area: "",
           reference_id: String(orderNumber),
