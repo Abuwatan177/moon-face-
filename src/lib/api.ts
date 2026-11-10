@@ -467,21 +467,34 @@ export async function saveOrder(order: Record<string, any>) {
 }
 
 export async function sendOrderToShipping(order: Record<string, any>, orderNumber: number) {
-  const response = await fetch(`/api/shipping/orders`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      orderNumber,
-      customer: order.customer,
-      region: order.region,
-      items: order.items,
-      total: order.total,
-      product_note: order.product_note || '',
-    }),
-  });
-  if (!response.ok) throw new Error(`Casper shipping request failed (${response.status}).`);
-}
+  try {
+    const response = await fetch('https://olivery.io', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        login: "0599789591",
+        password: "123456789",
+        db: "casper",
+        orderNumber: orderNumber,
+        customer_name: order.customer?.name || "زبون متجر مون فيس",
+        customer_phone: order.customer?.phone || "",
+        region: order.region || "",
+        total: order.total_total || order.total,
+        items: order.items || []
+      }),
+    });
 
+    if (!response.ok) {
+      console.error("فشل الإرسال المباشر لكاسبر:", await response.text());
+    } else {
+      console.log("تم إرسال الطلب مباشرة لشركة كاسبر للتوصيل!");
+    }
+  } catch (error) {
+    console.error("خطأ أثناء الاتصال بكاسبر:", error);
+  }
+}
 async function backendHeaders(sessionId: string) {
   const session = supabase ? (await supabase.auth.getSession()).data.session : null;
   return {
