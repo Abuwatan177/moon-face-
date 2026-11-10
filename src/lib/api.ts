@@ -468,7 +468,7 @@ export async function saveOrder(order: Record<string, any>) {
 
 export async function sendOrderToShipping(order: Record<string, any>, orderNumber: number) {
   try {
-    const response = await fetch('https://olivery.io', {
+const response = await fetch('https://casper.delivery', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
