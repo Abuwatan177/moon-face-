@@ -445,7 +445,14 @@ export async function saveOrder(order: Record<string, any>) {
   if (supabase) {
     const customer = order.customer || {};
     const { data, error } = await supabase.rpc('create_store_order', {
-      p_payload: order,
+      p_payload: {
+        items: Array.isArray(order.items) ? order.items.map((item: { id: number; color: string; quantity: number }) => ({
+          id: item.id,
+          color: item.color,
+          quantity: item.quantity,
+        })) : [],
+        promoCode: String(order.promoCode || ''),
+      },
       p_customer_name: String(customer.name || ''),
       p_customer_phone: String(customer.phone || ''),
       p_customer_address: String(customer.address || ''),

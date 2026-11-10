@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Bell, Check, LoaderCircle, Minus, Plus, ShoppingBag, Trash2, X } from 'lucide-react';
+import { Bell, Check, LoaderCircle, MessageCircle, Minus, Plus, ShoppingBag, Trash2, X } from 'lucide-react';
 import AnimatedActionButton from './AnimatedActionButton';
 import StoredMedia from './StoredMedia';
 import type { Product } from '../data/products';
@@ -18,6 +18,7 @@ export default function CartDrawer({ open, items, sessionId, whatsappNumber, onC
   const [region, setRegion] = useState<'الضفة' | 'القدس' | 'الداخل'>('الضفة');
   const [customer, setCustomer] = useState({ name: '', phone: '', address: '' });
   const [orderNotice, setOrderNotice] = useState<{ number: string; token: string } | null>(null);
+  const [whatsappHref, setWhatsappHref] = useState('');
   const [couponInput, setCouponInput] = useState('');
   const [couponApplied, setCouponApplied] = useState(false);
   const [couponDiscountPercent, setCouponDiscountPercent] = useState(0);
@@ -94,6 +95,7 @@ export default function CartDrawer({ open, items, sessionId, whatsappNumber, onC
     if (!customer.name || !customer.phone || !customer.address || !items.length) return false;
     const whatsappDigits = whatsappNumber.replace(/\D/g, '');
     const whatsappWindow = whatsappDigits ? window.open('about:blank', '_blank') : null;
+    setWhatsappHref('');
     const order = {
       customer,
       region,
@@ -108,7 +110,7 @@ export default function CartDrawer({ open, items, sessionId, whatsappNumber, onC
     };
     try {
       const result = await saveOrder(order);
-      if (whatsappWindow) {
+      if (whatsappDigits) {
         const message = [
           'طلب جديد من متجر Moon Face',
           `رقم الطلب: ${result.orderNumber}`,
@@ -120,14 +122,18 @@ export default function CartDrawer({ open, items, sessionId, whatsappNumber, onC
           ...order.items.map((item) => `- ${item.name} (${item.color}) × ${item.quantity} = ₪${item.price * item.quantity}`),
           `المجموع: ₪${order.total}`,
         ].join('\n');
-        whatsappWindow.location.href = `https://wa.me/${whatsappDigits}?text=${encodeURIComponent(message)}`;
+        const whatsappUrl = new URL(`https://wa.me/${whatsappDigits}`);
+        whatsappUrl.searchParams.set('text', message);
+        setWhatsappHref(whatsappUrl.href);
+        if (whatsappWindow) whatsappWindow.location.href = whatsappUrl.href;
       }
       void sendOrderToShipping(order, result.orderNumber).catch((error) => {
         console.warn('Shipping request failed; the order was saved successfully.', error);
       });
       return `${result.orderNumber}:${result.trackingToken}`;
-    } catch {
+    } catch (error) {
       whatsappWindow?.close();
+      console.error('Order submission failed:', error);
       return false;
     }
   };
@@ -152,7 +158,7 @@ export default function CartDrawer({ open, items, sessionId, whatsappNumber, onC
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 bg-black/40 z-[60]" />
     <motion.aside initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 26 }} dir={language === 'en' ? 'ltr' : 'rtl'} className="fixed top-0 right-0 h-full w-full max-w-md bg-[#f6f3e8] z-[61] shadow-2xl p-5 sm:p-7 overflow-y-auto">
       <div className="flex items-center justify-between mb-6"><h2 className="text-2xl font-bold">{t('cart')}</h2><button onClick={onClose} className="p-2 rounded-full hover:bg-moon-face-100" aria-label={t('close')}><X /></button></div>
-      {orderNotice && <div role="status" className="mb-5 border-r-4 border-[#5e6d49] bg-[#e8e7da] p-4"><p className="font-bold">{t('orderConfirmed')} #{orderNotice.number}</p><p className="mt-2 text-sm">{t('orderTrackingCode')}</p><code dir="ltr" className="mt-1 block select-all break-all rounded bg-white px-2 py-1 text-xs">{orderNotice.token}</code><p className="mt-2 text-sm">{t('orderTrackingHint')}</p></div>}
+      {orderNotice && <div role="status" className="mb-5 border-r-4 border-[#5e6d49] bg-[#e8e7da] p-4"><p className="font-bold">{t('orderConfirmed')} #{orderNotice.number}</p><p className="mt-2 text-sm">{t('orderTrackingCode')}</p><code dir="ltr" className="mt-1 block select-all break-all rounded bg-white px-2 py-1 text-xs">{orderNotice.token}</code><p className="mt-2 text-sm">{t('orderTrackingHint')}</p>{whatsappHref && <a href={whatsappHref} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-2 rounded border border-[#5e6d49] px-3 py-2 text-sm font-semibold text-[#3d4b30]"><MessageCircle size={16} />{t('openWhatsApp')}</a>}</div>}
       {!items.length ? <p className="text-center py-16 text-charcoal-500">{t('emptyCart')}</p> : <>
         <div className="space-y-4">{items.map((item) => <div key={item.lineId} className="flex gap-3 items-center bg-white rounded-xl p-3 shadow-sm">
           <StoredMedia type="image" source={item.image} alt={language === 'ar' ? item.nameAr : item.name} className="w-16 h-20 shrink-0 object-cover rounded-lg" />
