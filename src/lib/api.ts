@@ -467,7 +467,7 @@ export async function saveOrder(order: Record<string, any>) {
 }
 
 export async function sendOrderToShipping(order: Record<string, any>, orderNumber: number) {
-  const response = await fetch(`${backendUrl}/api/shipping/orders`, {
+  const response = await fetch(`/api/shipping/orders`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
