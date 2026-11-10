@@ -474,25 +474,32 @@ export async function sendOrderToShipping(order: Record<string, any>, orderNumbe
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        login: "0599789591",
-        password: "123456789",
-        db: "casper",
-        orderNumber: orderNumber,
-        customer_name: order.customer?.name || "زبون متجر مون فيس",
-        customer_phone: order.customer?.phone || "",
-        region: order.region || "",
-        total: order.total_total || order.total,
-        items: order.items || []
+        jsonrpc: "2.0",
+        params: {
+          login: "0599789591",
+          password: "123456789",
+          db: "casper",
+          customer_name: order.customer?.name || "زبون متجر مون فيس",
+          customer_mobile: order.customer?.phone || "",
+          customer_address: order.customer?.address || order.region || "",
+          customer_area: order.region || "عام",
+          customer_sub_area: "",
+          reference_id: String(orderNumber),
+          cost: order.total_total || order.total || 0,
+          order_type_id: "1",
+          note: order.product_note || "طلب من المتجر الإلكتروني",
+          paid: true,
+          delivery_fee_on_customer: false,
+          delivery_fee_on_sender: false,
+          product_note: ""
+        }
       }),
     });
 
-    if (!response.ok) {
-      console.error("فشل الإرسال المباشر لكاسبر:", await response.text());
-    } else {
-      console.log("تم إرسال الطلب مباشرة لشركة كاسبر للتوصيل!");
-    }
+    const resData = await response.json();
+    console.log("استجابة سيرفر كاسبر:", resData);
   } catch (error) {
-    console.error("خطأ أثناء الاتصال بكاسبر:", error);
+    console.error("خطأ أثناء الاتصال المباشر بكاسبر:", error);
   }
 }
 async function backendHeaders(sessionId: string) {
