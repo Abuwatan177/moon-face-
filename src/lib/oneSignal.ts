@@ -45,8 +45,8 @@ export async function subscribeWithOneSignal() {
             appId,
             allowLocalhostAsSecureOrigin: import.meta.env.DEV,
             autoResubscribe: true,
-            serviceWorkerPath: '/push/onesignal/OneSignalSDKWorker.js',
-            serviceWorkerParam: { scope: '/push/onesignal/' },
+            serviceWorkerPath: '/OneSignalSDKWorker.js',
+            serviceWorkerParam: { scope: '/' },
           });
           resolve(sdk);
         } catch (error) {
