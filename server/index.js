@@ -132,7 +132,7 @@ async function callCasper(endpoint, method, params) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       signal: controller.signal,
-      body: JSON.stringify({ jsonrpc: '2.9', method, params }),
+      body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method, params }),
     });
     let rpcResponse;
     try {
@@ -388,6 +388,7 @@ async function sendCasperOrderToDelivery({ orderNumber, customer, region, items,
       customer_mobile: validatedCustomer.phone,
       customer_name: validatedCustomer.name,
       customer_area: String(region || '').trim(),
+      reference_id: String(orderNumber),
       cost: Number(total),
       order_type_id: '1',
       note: typeof productNote === 'string' ? productNote.slice(0, 500) : '',
@@ -434,7 +435,7 @@ app.post('/api/orders/checkout', async (request, response) => {
   });
 
   if (!result.sent) {
-    return response.status(502).json({ error: 'Casper delivery provider is unavailable.' });
+    return response.status(502).json({ error: 'Casper delivery provider is unavailable.', reason: result.reason });
   }
   return response.json({
     ok: true,
@@ -474,7 +475,7 @@ app.post('/api/shipping/orders', async (request, response) => {
   });
 
   if (!result.sent) {
-    return response.status(502).json({ error: 'Casper delivery provider is unavailable.' });
+    return response.status(502).json({ error: 'Casper delivery provider is unavailable.', reason: result.reason });
   }
   response.sendStatus(204);
 });
