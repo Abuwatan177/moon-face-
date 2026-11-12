@@ -514,6 +514,16 @@ function ProductsTab({ draft, productTypes, update, onDraftChange, onSave, savin
     {productSection === 'existing' && <div className="space-y-4">{draft.map((product, index) => {
       const colors = product.colors?.length ? product.colors : (Array.isArray(product.images) ? product.images : []).map((item) => ({ name: item.color, available: true, image: getProductImageUrl(item.img), images: [getProductImageUrl(item.img)] }));
       const setColors = (next: Product['colors']) => update(index, { colors: next, images: next.flatMap((item) => (getProductImageUrls(item.images).length ? getProductImageUrls(item.images) : [getProductImageUrl(item.image)]).filter(Boolean).map((image) => ({ color: item.name, img: image }))) });
+      const deleteColor = (colorIndex: number) => {
+        const removedColor = colors[colorIndex];
+        const nextColors = colors.filter((_, itemIndex) => itemIndex !== colorIndex);
+        setColors(nextColors);
+        const removedImages = new Set([getProductImageUrl(removedColor.image), ...getProductImageUrls(removedColor.images)].filter(Boolean));
+        if (removedImages.has(getProductImageUrl(product.image))) {
+          const replacementImage = nextColors.flatMap((item) => [getProductImageUrl(item.image), ...getProductImageUrls(item.images)]).find(Boolean) || '';
+          update(index, { image: replacementImage });
+        }
+      };
       const updateColor = (colorIndex: number, change: (color: Product['colors'][number]) => Product['colors'][number]) => {
         onDraftChange((current) => current.map((item, itemIndex) => {
           if (itemIndex !== index) return item;
@@ -556,7 +566,7 @@ function ProductsTab({ draft, productTypes, update, onDraftChange, onSave, savin
           </datalist>
         </label>
         <label className="block text-xs text-charcoal-500 mt-3">الصورة الرئيسية للمنتج<input type="file" accept="image/*" className="field mt-1 text-xs" onChange={(e) => readImage(e.target.files?.[0], (image) => update(index, { image }), onError)} /></label>
-        <div className="mt-4 border-t pt-3"><p className="font-bold text-sm mb-2">الألوان والصور والفيديو والتوفر</p><div className="space-y-3">{colors.map((color, colorIndex) => <div key={`${color.name}-${colorIndex}`} className="rounded-xl bg-moon-face-50 p-2"><div className="flex gap-2 items-center"><input className="field" value={color.name} onChange={(e) => setColors(colors.map((item, i) => i === colorIndex ? { ...item, name: e.target.value } : item))} placeholder="اسم اللون" /><button onClick={() => setColors(colors.map((item, i) => i === colorIndex ? { ...item, available: !item.available } : item))} className={`px-3 py-2 rounded-lg text-xs whitespace-nowrap ${color.available ? 'availability-available' : 'availability-unavailable'}`}>{color.available ? 'اللون متوفر' : 'اللون غير متوفر'}</button></div><ColorMediaEditor color={color} uploadImages={uploadImages} onError={onError} onChange={(change) => updateColor(colorIndex, change)} /></div>)}</div><button onClick={() => setColors([...colors, { name: '', available: true, image: '', images: [], media: [] }])} className="mt-2 text-xs text-moon-face-700">+ إضافة لون</button></div>
+        <div className="mt-4 border-t pt-3"><p className="font-bold text-sm mb-2">الألوان والصور والفيديو والتوفر</p><div className="space-y-3">{colors.map((color, colorIndex) => <div key={`${color.name}-${colorIndex}`} className="rounded-xl bg-moon-face-50 p-2"><div className="flex gap-2 items-center"><input className="field" value={color.name} onChange={(e) => setColors(colors.map((item, i) => i === colorIndex ? { ...item, name: e.target.value } : item))} placeholder="اسم اللون" /><button type="button" onClick={() => setColors(colors.map((item, i) => i === colorIndex ? { ...item, available: !item.available } : item))} className={`px-3 py-2 rounded-lg text-xs whitespace-nowrap ${color.available ? 'availability-available' : 'availability-unavailable'}`}>{color.available ? 'اللون متوفر' : 'اللون غير متوفر'}</button><button type="button" disabled={saving || uploadingImages} onClick={() => deleteColor(colorIndex)} aria-label={`حذف اللون ${color.name || colorIndex + 1}`} title="حذف اللون" className="rounded-lg p-2 text-red-500 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"><Trash2 size={16} /></button></div><ColorMediaEditor color={color} uploadImages={uploadImages} onError={onError} onChange={(change) => updateColor(colorIndex, change)} /></div>)}</div><button type="button" onClick={() => setColors([...colors, { name: '', available: true, image: '', images: [], media: [] }])} className="mt-2 text-xs text-moon-face-700">+ إضافة لون</button></div>
       </div>;
     })}</div>}
     <button disabled={saving || uploadingImages} onClick={() => void onSave()} className="w-full mt-6 py-4 rounded-xl bg-[#3B2A22] text-white font-bold transition-opacity disabled:cursor-wait disabled:opacity-60">{saving ? 'جارٍ الحفظ...' : 'حفظ تعديلات المنتجات'}</button>
@@ -666,8 +676,8 @@ function ColorMediaEditor({ color, onChange, uploadImages, onError }: { color: P
   return <div className="mt-2 space-y-2">
     <label className="flex w-fit items-center gap-2 text-xs font-semibold text-charcoal-600">
       <span>لون دائرة اللون</span>
-      <input type="color" value={color.customColor || getProductColorHex(color.name)} onChange={(event) => onChange({ ...color, customColor: event.target.value })} className="size-10 cursor-pointer rounded-md border border-moon-face-200 bg-white p-1" aria-label={`لون دائرة ${color.name || 'اللون'}`} />
-      {color.customColor && <button type="button" onClick={() => onChange({ ...color, customColor: undefined })} className="grid size-8 place-items-center rounded-md text-charcoal-500 hover:bg-moon-face-100" aria-label={`استعادة اللون التلقائي ${color.name}`} title="استعادة اللون التلقائي"><RotateCcw size={15} /></button>}
+      <input type="color" value={color.customColor || getProductColorHex(color.name)} onChange={(event) => onChange((currentColor) => ({ ...currentColor, customColor: event.target.value }))} className="size-10 cursor-pointer rounded-md border border-moon-face-200 bg-white p-1" aria-label={`لون دائرة ${color.name || 'اللون'}`} />
+      {color.customColor && <button type="button" onClick={() => onChange((currentColor) => ({ ...currentColor, customColor: undefined }))} className="grid size-8 place-items-center rounded-md text-charcoal-500 hover:bg-moon-face-100" aria-label={`استعادة اللون التلقائي ${color.name}`} title="استعادة اللون التلقائي"><RotateCcw size={15} /></button>}
     </label>
     <label className="flex cursor-pointer items-center gap-2 text-xs text-charcoal-500"><ImagePlus size={16} /> إضافة صور لهذا اللون
       <input type="file" accept="image/*" multiple className="hidden" onChange={(event) => { const files = Array.from(event.currentTarget.files || []).filter((file) => file.type.startsWith('image/')); event.currentTarget.value = ''; if (files.length) void addImages(files); }} />
