@@ -5,13 +5,16 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "backend": "node --env-file=.env.server server/index.js",
+    "backend": "node --env-file-if-exists=.env.server --env-file-if-exists=.env server/index.js",
     "build": "vite build",
     "preview": "vite preview",
     "compress-images": "node scripts/compress-old-images.mjs",
-    "media:migrate:compress": "node --env-file=.env.server scripts/compress-store-media.mjs"
+    "media:migrate:compress": "node --env-file=.env.server scripts/compress-store-media.mjs",
+    "media:migrate:r2": "node scripts/migrate-supabase-to-r2.mjs"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1167.0",
+    "@aws-sdk/s3-request-presigner": "^3.1167.0",
     "@supabase/supabase-js": "^2.118.0",
     "clsx": "2.1.1",
     "express": "^5.2.1",

@@ -1139,17 +1139,46 @@ export async function deleteProductComment(id: string) {
   invalidateProductFeedback();
 }
 
-export async function saveUploadedMedia(blob: Blob, filename: string, tryLosslessCompression = false) {
+export async function saveUploadedMedia(blob: Blob, _filename: string, tryLosslessCompression = false) {
   if (blob.size > 100 * 1024 * 1024) throw new Error('حجم الملف يتجاوز 100MB. اختر ملفاً أصغر.');
   if (blob.type.startsWith('image/') && blob.type !== 'image/webp') {
     throw new Error('يجب تحويل الصورة إلى WebP قبل حفظها.');
   }
   if (supabase) {
-    const extension = blob.type === 'image/webp' ? 'webp' : filename.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin';
-    const path = `${crypto.randomUUID()}.${extension}`;
-    const { error } = await supabase.storage.from('store-media').upload(path, blob, { contentType: blob.type || 'application/octet-stream', upsert: false, cacheControl: '31536000' });
-    if (error) throw error;
-    return supabase.storage.from('store-media').getPublicUrl(path).data.publicUrl;
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) throw sessionError;
+    if (!session?.access_token) throw new Error('يجب تسجيل الدخول كمالك للمتجر لرفع الملفات.');
+
+    const response = await fetch(`${backendUrl}/api/upload-r2`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ contentType: blob.type, size: blob.size }),
+    });
+    const result = await response.json().catch(() => ({})) as {
+      uploadUrl?: string;
+      publicUrl?: string;
+      contentType?: string;
+      cacheControl?: string;
+      error?: string;
+    };
+    if (!response.ok) throw new Error(result.error || `تعذر تجهيز رفع الملف (HTTP ${response.status}).`);
+    if (!result.uploadUrl || !result.publicUrl || !result.contentType || !result.cacheControl) {
+      throw new Error('استجابة رفع الملف غير مكتملة.');
+    }
+
+    const uploadResponse = await fetch(result.uploadUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': result.contentType,
+        'Cache-Control': result.cacheControl,
+      },
+      body: blob,
+    });
+    if (!uploadResponse.ok) throw new Error(`تعذر رفع الملف إلى Cloudflare R2 (HTTP ${uploadResponse.status}).`);
+    return result.publicUrl;
   }
   return saveLocalMedia(blob, tryLosslessCompression);
 }

@@ -1,7 +1,9 @@
-import { createHash, timingSafeEqual } from 'node:crypto';
+import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import express from 'express';
 import webpush from 'web-push';
 import { createClient } from '@supabase/supabase-js';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const { SUPABASE_SERVICE_ROLE_KEY, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, ONESIGNAL_APP_ID, ONESIGNAL_REST_API_KEY } = process.env;
@@ -14,6 +16,43 @@ const supabase = missingSupabaseVariables.length ? null : createClient(supabaseU
 });
 const mediaBucket = 'store-media';
 const mediaCleanupGraceMs = 48 * 60 * 60 * 1000;
+const r2BucketName = process.env.R2_BUCKET_NAME?.trim();
+const r2PublicUrl = process.env.R2_PUBLIC_URL?.trim().replace(/\/+$/, '');
+const r2Endpoint = process.env.R2_ENDPOINT?.trim();
+const isHttpsUrl = (value) => {
+  try { return new URL(value).protocol === 'https:'; } catch { return false; }
+};
+const r2Configured = Boolean(
+  process.env.R2_ACCOUNT_ID?.trim()
+  && r2Endpoint
+  && isHttpsUrl(r2Endpoint)
+  && r2BucketName
+  && r2PublicUrl
+  && isHttpsUrl(r2PublicUrl)
+  && process.env.R2_ACCESS_KEY_ID
+  && process.env.R2_SECRET_ACCESS_KEY,
+);
+const r2Client = r2Configured ? new S3Client({
+  region: 'auto',
+  endpoint: r2Endpoint,
+  forcePathStyle: true,
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID,
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+  },
+}) : null;
+const r2UploadTypes = new Map([
+  ['image/webp', 'webp'],
+  ['video/mp4', 'mp4'],
+  ['video/webm', 'webm'],
+  ['video/quicktime', 'mov'],
+  ['video/ogg', 'ogv'],
+  ['video/x-m4v', 'm4v'],
+  ['video/mpeg', 'mpeg'],
+  ['video/3gpp', '3gp'],
+  ['video/3gpp2', '3g2'],
+]);
+const r2UploadCacheControl = 'public, max-age=31536000, immutable';
 const app = express();
 const port = Number(process.env.API_PORT || 3001);
 const casperLogin = process.env.CASPER_LOGIN?.trim();
@@ -39,6 +78,7 @@ const allowedOrigins = new Set([
 const frontendOrigin = new URL(process.env.FRONTEND_URL || [...allowedOrigins][0]).origin;
 let vapidConfigured = Boolean(VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY && process.env.VAPID_SUBJECT);
 const oneSignalConfigured = Boolean(ONESIGNAL_APP_ID && ONESIGNAL_REST_API_KEY);
+const supabaseMediaCleanupEnabled = process.env.SUPABASE_MEDIA_CLEANUP_ENABLED === 'true';
 
 function logLimitedError(key, ...details) {
   const now = Date.now();
@@ -255,6 +295,52 @@ app.get(['/share/product/:id', '/api/share/product/:id'], async (request, respon
 app.get('/api/push/public-key', (_request, response) => {
   if (!vapidConfigured) return response.status(503).json({ error: 'Push notifications are not configured.' });
   response.json({ publicKey: VAPID_PUBLIC_KEY });
+});
+
+app.post('/api/upload-r2', async (request, response) => {
+  if (!r2Configured || !r2Client) {
+    return response.status(503).json({ error: 'Cloudflare R2 uploads are not configured on the server.' });
+  }
+  if (!supabase) {
+    return response.status(503).json({ error: 'Supabase authentication is not configured on the server.' });
+  }
+
+  try {
+    await requireStoreOwner(request);
+  } catch (error) {
+    const status = Number(error?.status);
+    if (status === 401 || status === 403) {
+      return response.status(status).json({ error: error.message });
+    }
+    logLimitedError('r2-upload-auth', 'Could not verify R2 upload authorization:', error?.name || 'Unknown error');
+    return response.status(503).json({ error: 'Could not verify upload authorization.' });
+  }
+
+  const contentType = typeof request.body?.contentType === 'string'
+    ? request.body.contentType.split(';', 1)[0].trim().toLowerCase()
+    : '';
+  const extension = r2UploadTypes.get(contentType);
+  const size = Number(request.body?.size);
+  if (!extension || !Number.isSafeInteger(size) || size < 1 || size > 100 * 1024 * 1024) {
+    return response.status(400).json({ error: 'Unsupported file type or size.' });
+  }
+
+  try {
+    const key = `${randomUUID()}.${extension}`;
+    const uploadUrl = await getSignedUrl(r2Client, new PutObjectCommand({
+      Bucket: r2BucketName,
+      Key: key,
+      ContentType: contentType,
+      ContentLength: size,
+      CacheControl: r2UploadCacheControl,
+    }), { expiresIn: 300 });
+    const publicUrl = `${r2PublicUrl}/${key}`;
+    response.setHeader('Cache-Control', 'no-store');
+    response.json({ uploadUrl, publicUrl, contentType, cacheControl: r2UploadCacheControl });
+  } catch (error) {
+    logLimitedError('r2-upload-signing', 'Could not sign an R2 upload:', error?.name || 'Unknown error');
+    response.status(500).json({ error: 'Could not prepare the media upload.' });
+  }
 });
 
 app.post('/api/cart-sessions', async (request, response, next) => {
@@ -737,6 +823,9 @@ async function removeUnusedStoreImages(dryRun = false) {
 }
 
 const runUnusedMediaCleanup = async (request, response) => {
+  if (!supabaseMediaCleanupEnabled) {
+    return response.status(503).json({ error: 'Supabase media cleanup is disabled until explicitly enabled.' });
+  }
   if (!cronJobToken) return response.status(503).json({ error: 'Cron job authentication is not configured.' });
   if (!isAuthorizedCronRequest(request)) return response.status(401).json({ error: 'Unauthorized.' });
   try {
