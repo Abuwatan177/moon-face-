@@ -84,7 +84,7 @@ type Props = {
   onBlur?: FocusEventHandler<HTMLVideoElement>;
 };
 
-export function LazyImage({ source, alt, className = '', style, loading = 'lazy' }: { source: string; alt: string; className?: string; style?: CSSProperties; loading?: 'eager' | 'lazy' }) {
+export function LazyImage({ source, alt, className = '', style, loading = 'lazy', width = 640, height = 800 }: { source: string; alt: string; className?: string; style?: CSSProperties; loading?: 'eager' | 'lazy'; width?: number; height?: number }) {
   const imageRef = useRef<HTMLImageElement | null>(null);
   const [visibleSource, setVisibleSource] = useState('');
 
@@ -107,7 +107,7 @@ export function LazyImage({ source, alt, className = '', style, loading = 'lazy'
     return () => observer.disconnect();
   }, [loading, source]);
 
-  return <img ref={imageRef} src={loading === 'eager' || visibleSource === source ? source : undefined} alt={alt} className={className} style={style} loading={loading} decoding="async" />;
+  return <img ref={imageRef} src={loading === 'eager' || visibleSource === source ? source : undefined} alt={alt} className={className} style={style} width={width} height={height} loading={loading} decoding="async" />;
 }
 
 const StoredMedia = forwardRef<HTMLVideoElement, Props>(function StoredMedia({ type, source, alt, className = '', controls = false, autoPlay = false, autoPlayWhenVisible = false, muted = false, loop = false, onMouseEnter, onMouseLeave, onFocus, onBlur }, ref) {

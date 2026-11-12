@@ -1147,7 +1147,7 @@ export async function saveUploadedMedia(blob: Blob, filename: string, tryLossles
   if (supabase) {
     const extension = blob.type === 'image/webp' ? 'webp' : filename.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin';
     const path = `${crypto.randomUUID()}.${extension}`;
-    const { error } = await supabase.storage.from('store-media').upload(path, blob, { contentType: blob.type || 'application/octet-stream', upsert: false, cacheControl: '3600' });
+    const { error } = await supabase.storage.from('store-media').upload(path, blob, { contentType: blob.type || 'application/octet-stream', upsert: false, cacheControl: '31536000' });
     if (error) throw error;
     return supabase.storage.from('store-media').getPublicUrl(path).data.publicUrl;
   }

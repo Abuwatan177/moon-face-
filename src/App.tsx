@@ -402,7 +402,7 @@ export default function App() {
       <div className="relative z-[1]">
       <div aria-hidden="true" className="store-loader-screen fixed inset-0 z-[100] grid place-items-center bg-[#3B2A22] text-[#f6f3e8]">
           <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="flex flex-col items-center gap-5">
-            <img src={toWebpStorageUrl(siteContent.storeLogo)} alt="Moon Face" className="w-44 sm:w-56" />
+            <img src={toWebpStorageUrl(siteContent.storeLogo)} alt="Moon Face" className="w-44 sm:w-56" decoding="async" fetchPriority="high" />
             <span className="h-1 w-36 overflow-hidden rounded-full bg-white/15"><motion.span initial={{ width: '12%' }} animate={{ width: '100%' }} transition={{ duration: 0.52, ease: 'easeInOut' }} className="block h-full rounded-full bg-[#b9bc93]" /></span>
           </motion.div>
       </div>

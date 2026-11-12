@@ -70,7 +70,7 @@ async function processImage(storage, bucket, path, apply) {
   const { error: uploadError } = await storage.from(bucket).upload(path, result.buffer, {
     contentType,
     upsert: true,
-    cacheControl: '3600',
+    cacheControl: '86400',
   });
   if (uploadError) throw new Error(`Overwrite failed: ${uploadError.message}`);
 
