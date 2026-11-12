@@ -20,7 +20,7 @@ const casperLogin = process.env.CASPER_LOGIN?.trim();
 const casperPassword = process.env.CASPER_PASSWORD;
 const casperDatabase = process.env.CASPER_DB?.trim() || 'casper';
 const casperCreateOrderUrl = process.env.CASPER_CREATE_ORDER_URL?.trim() || 'https://casper.olivery.io/create_order';
-const casperStatusesUrl = process.env.CASPER_STATUSES_URL?.trim() || 'https://casper.olivery.io/get_statuses';
+const casperStatusesUrl = process.env.CASPER_STATUSES_URL?.trim() || 'https://casper.olivery.io/status';
 const casperOrderStatusUrl = process.env.CASPER_ORDER_STATUS_URL?.trim() || 'https://casper.olivery.io/get_status';
 const cronJobToken = process.env.CRON_SECRET?.trim() || process.env.CRON_JOB_TOKEN?.trim();
 const configuredAbandonmentMinutes = Number(process.env.CART_ABANDONMENT_MINUTES || 180);
@@ -368,6 +368,13 @@ app.get('/api/shipping/orders/:orderNumber/status', async (request, response) =>
   }
 });
 
+// Store delivery choices -> exact Casper area names (from Casper get_areas).
+const casperAreaByRegion = {
+  'الضفة': 'الضفة الغربية WB',
+  'القدس': 'القدس',
+  'الداخل': 'الداخل 48 وسط/شمال',
+};
+
 async function sendCasperOrderToDelivery({ orderNumber, customer, region, items, total, productNote = '' }) {
   if (!casperLogin || !casperPassword) {
     console.warn('Casper delivery is not configured; checkout remains successful but no shipment was sent.');
@@ -381,7 +388,7 @@ async function sendCasperOrderToDelivery({ orderNumber, customer, region, items,
   };
 
   try {
-    await callCasper(casperCreateOrderUrl, 'create_order', {
+    const casperResult = await callCasper(casperCreateOrderUrl, 'create_order', {
       login: casperLogin,
       password: casperPassword,
       db: casperDatabase,
@@ -389,7 +396,7 @@ async function sendCasperOrderToDelivery({ orderNumber, customer, region, items,
       customer_mobile: validatedCustomer.phone,
       customer_name: validatedCustomer.name,
       second_mobile_number: '',
-      customer_area: String(region || '').trim(),
+      customer_area: casperAreaByRegion[String(region || '').trim()] || String(region || '').trim(),
       customer_sub_area: '',
       reference_id: String(orderNumber),
       cost: Number(total),
@@ -399,7 +406,11 @@ async function sendCasperOrderToDelivery({ orderNumber, customer, region, items,
       delivery_fee_on_customer: false,
       delivery_fee_on_sender: false,
     });
-    return { sent: true, reason: 'ok' };
+    console.log('Casper create_order result:', JSON.stringify(casperResult)?.slice(0, 800));
+    const looksFailed = casperResult && typeof casperResult === 'object' && !Array.isArray(casperResult)
+      && (casperResult.error || casperResult.success === false || casperResult.status === 'error' || casperResult.status === false);
+    if (looksFailed) throw new Error(`Casper rejected the order: ${JSON.stringify(casperResult).slice(0, 500)}`);
+    return { sent: true, reason: 'ok', casper: casperResult };
   } catch (error) {
     logLimitedError('casper-create-order', `Casper request failed for order ${orderNumber}:`, error.message);
     console.error('Checkout succeeded, but Casper sync failed:', { orderNumber, message: error.message });
@@ -480,7 +491,7 @@ app.post('/api/shipping/orders', async (request, response) => {
   if (!result.sent) {
     return response.status(502).json({ error: 'Casper delivery provider is unavailable.', reason: result.reason });
   }
-  response.sendStatus(204);
+  response.json({ ok: true, casper: result.casper });
 });
 
 app.post('/api/push-subscriptions', async (request, response, next) => {
