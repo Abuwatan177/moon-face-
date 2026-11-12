@@ -19,8 +19,9 @@ const port = Number(process.env.API_PORT || 3001);
 const casperLogin = process.env.CASPER_LOGIN?.trim();
 const casperPassword = process.env.CASPER_PASSWORD;
 const casperDatabase = process.env.CASPER_DB?.trim() || 'casper';
-const casperStatusesUrl = process.env.CASPER_STATUSES_URL?.trim() || 'https://casper.delivery/get_statuses';
-const casperOrderStatusUrl = process.env.CASPER_ORDER_STATUS_URL?.trim() || 'https://casper.delivery/get_status';
+const casperCreateOrderUrl = process.env.CASPER_CREATE_ORDER_URL?.trim() || 'https://casper.olivery.io/create_order';
+const casperStatusesUrl = process.env.CASPER_STATUSES_URL?.trim() || 'https://casper.olivery.io/get_statuses';
+const casperOrderStatusUrl = process.env.CASPER_ORDER_STATUS_URL?.trim() || 'https://casper.olivery.io/get_status';
 const cronJobToken = process.env.CRON_SECRET?.trim() || process.env.CRON_JOB_TOKEN?.trim();
 const configuredAbandonmentMinutes = Number(process.env.CART_ABANDONMENT_MINUTES || 180);
 const abandonmentMinutes = Number.isFinite(configuredAbandonmentMinutes) ? Math.max(180, configuredAbandonmentMinutes) : 180;
@@ -132,7 +133,7 @@ async function callCasper(endpoint, method, params) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       signal: controller.signal,
-      body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method, params }),
+      body: JSON.stringify({ jsonrpc: '2.0', params }),
     });
     let rpcResponse;
     try {
@@ -380,14 +381,16 @@ async function sendCasperOrderToDelivery({ orderNumber, customer, region, items,
   };
 
   try {
-    await callCasper('https://casper.delivery/create_order', 'create_order', {
+    await callCasper(casperCreateOrderUrl, 'create_order', {
       login: casperLogin,
       password: casperPassword,
       db: casperDatabase,
       customer_address: validatedCustomer.address,
       customer_mobile: validatedCustomer.phone,
       customer_name: validatedCustomer.name,
+      second_mobile_number: '',
       customer_area: String(region || '').trim(),
+      customer_sub_area: '',
       reference_id: String(orderNumber),
       cost: Number(total),
       order_type_id: '1',
