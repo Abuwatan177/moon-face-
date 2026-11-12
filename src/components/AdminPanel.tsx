@@ -55,6 +55,7 @@ export default function AdminPanel({ products, onSave, siteContent, onSaveSiteCo
   const [archiveLoading, setArchiveLoading] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [productsSaving, setProductsSaving] = useState(false);
+  const [productImagesUploading, setProductImagesUploading] = useState(0);
   const [contentSaving, setContentSaving] = useState(false);
   const [contentSaved, setContentSaved] = useState(false);
   const savingProductsRef = useRef(false);
@@ -139,10 +140,13 @@ export default function AdminPanel({ products, onSave, siteContent, onSaveSiteCo
     }
   };
 
-  // تعريف دالة قراءة الصور بشكل مستقل وصحيح
-  const readImages = (files: FileList | null, onRead: (images: string[]) => void) => {
-    if (!files?.length) return;
-    void uploadOptimizedImages(Array.from(files)).then(onRead).catch(() => setSaveError('تعذر حفظ الصور في التخزين.'));
+  const uploadProductImages = async (files: File[]) => {
+    setProductImagesUploading((current) => current + 1);
+    try {
+      return await uploadOptimizedImages(files);
+    } finally {
+      setProductImagesUploading((current) => Math.max(0, current - 1));
+    }
   };
 
   const readMediaFiles = (files: FileList | null, onRead: (media: NonNullable<Product['media']>) => void) => {
@@ -152,6 +156,10 @@ export default function AdminPanel({ products, onSave, siteContent, onSaveSiteCo
   };
 
 const save = async (productsToSave?: Product[]) => {
+  if (productImagesUploading > 0) {
+    setSaveError('انتظر اكتمال رفع الصور قبل حفظ المنتجات.');
+    return;
+  }
   if (savingProductsRef.current) return;
   savingProductsRef.current = true;
   setProductsSaving(true);
@@ -205,7 +213,7 @@ const save = async (productsToSave?: Product[]) => {
               <button onClick={() => { setTab('archive'); void loadProductArchive(); }} className={`py-3 rounded-xl font-semibold transition-all ${tab === 'archive' ? 'bg-[#3B2A22] text-white' : 'bg-white'}`}>الأرشيف</button>
               <button onClick={() => setTab('notifications')} className={`py-3 rounded-xl font-semibold transition-all ${tab === 'notifications' ? 'bg-[#3B2A22] text-white' : 'bg-white'}`}>الإشعارات</button>
             </div>
-            {tab === 'products' ? <ProductsTab draft={draft} productTypes={siteContent.productTypes} update={update} onDraftChange={setDraft} onSave={save} saving={productsSaving} readImages={readImages} onError={setSaveError} /> : tab === 'orders' ? <OrdersTab orders={orders} products={products} loading={ordersLoading} onOrdersChange={setOrders} onError={setSaveError} /> : tab === 'activity' ? <ActivityTab activity={activity} loading={activityLoading} onRefresh={refreshActivity} onError={setSaveError} /> : tab === 'loyalty' ? <LoyaltyTab config={loyaltyConfig} loading={loyaltyLoading} saving={loyaltySaving} productTypes={siteContent.productTypes} update={setLoyaltyConfig} onSave={saveLoyalty} /> : tab === 'wheel' ? <WheelTab config={wheelConfig} loading={wheelLoading} saving={wheelSaving} update={setWheelConfig} onSave={saveWheel} /> : tab === 'archive' ? <ArchivedProductsTab products={archivedProducts} loading={archiveLoading} onRestore={restoreArchivedProduct} onDeletePermanently={permanentlyDeleteArchived} /> : tab === 'notifications' ? <BroadcastNotificationsTab /> : <ContentTab draft={contentDraft} products={products} update={setContentDraft} onSave={saveContent} readMediaFiles={readMediaFiles} onError={setSaveError} saving={contentSaving} saved={contentSaved} />}
+            {tab === 'products' ? <ProductsTab draft={draft} productTypes={siteContent.productTypes} update={update} onDraftChange={setDraft} onSave={save} saving={productsSaving} uploadingImages={productImagesUploading > 0} uploadImages={uploadProductImages} onError={setSaveError} /> : tab === 'orders' ? <OrdersTab orders={orders} products={products} loading={ordersLoading} onOrdersChange={setOrders} onError={setSaveError} /> : tab === 'activity' ? <ActivityTab activity={activity} loading={activityLoading} onRefresh={refreshActivity} onError={setSaveError} /> : tab === 'loyalty' ? <LoyaltyTab config={loyaltyConfig} loading={loyaltyLoading} saving={loyaltySaving} productTypes={siteContent.productTypes} update={setLoyaltyConfig} onSave={saveLoyalty} /> : tab === 'wheel' ? <WheelTab config={wheelConfig} loading={wheelLoading} saving={wheelSaving} update={setWheelConfig} onSave={saveWheel} /> : tab === 'archive' ? <ArchivedProductsTab products={archivedProducts} loading={archiveLoading} onRestore={restoreArchivedProduct} onDeletePermanently={permanentlyDeleteArchived} /> : tab === 'notifications' ? <BroadcastNotificationsTab /> : <ContentTab draft={contentDraft} products={products} update={setContentDraft} onSave={saveContent} readMediaFiles={readMediaFiles} onError={setSaveError} saving={contentSaving} saved={contentSaved} />}
           </div>
         ) : (
           <AnimatePresence>
@@ -227,7 +235,7 @@ const save = async (productsToSave?: Product[]) => {
                       <button onClick={() => { setTab('archive'); void loadProductArchive(); }} className={`py-3 rounded-xl font-semibold transition-all ${tab === 'archive' ? 'bg-[#3B2A22] text-white' : 'bg-white'}`}>الأرشيف</button>
                       <button onClick={() => setTab('notifications')} className={`py-3 rounded-xl font-semibold transition-all ${tab === 'notifications' ? 'bg-[#3B2A22] text-white' : 'bg-white'}`}>الإشعارات</button>
                     </div>
-                    {tab === 'products' ? <ProductsTab draft={draft} productTypes={siteContent.productTypes} update={update} onDraftChange={setDraft} onSave={save} saving={productsSaving} readImages={readImages} onError={setSaveError} /> : tab === 'orders' ? <OrdersTab orders={orders} products={products} loading={ordersLoading} onOrdersChange={setOrders} onError={setSaveError} /> : tab === 'activity' ? <ActivityTab activity={activity} loading={activityLoading} onRefresh={refreshActivity} onError={setSaveError} /> : tab === 'loyalty' ? <LoyaltyTab config={loyaltyConfig} loading={loyaltyLoading} saving={loyaltySaving} productTypes={siteContent.productTypes} update={setLoyaltyConfig} onSave={saveLoyalty} /> : tab === 'wheel' ? <WheelTab config={wheelConfig} loading={wheelLoading} saving={wheelSaving} update={setWheelConfig} onSave={saveWheel} /> : tab === 'archive' ? <ArchivedProductsTab products={archivedProducts} loading={archiveLoading} onRestore={restoreArchivedProduct} onDeletePermanently={permanentlyDeleteArchived} /> : tab === 'notifications' ? <BroadcastNotificationsTab /> : <ContentTab draft={contentDraft} products={products} update={setContentDraft} onSave={saveContent} readMediaFiles={readMediaFiles} onError={setSaveError} saving={contentSaving} saved={contentSaved} />}
+                    {tab === 'products' ? <ProductsTab draft={draft} productTypes={siteContent.productTypes} update={update} onDraftChange={setDraft} onSave={save} saving={productsSaving} uploadingImages={productImagesUploading > 0} uploadImages={uploadProductImages} onError={setSaveError} /> : tab === 'orders' ? <OrdersTab orders={orders} products={products} loading={ordersLoading} onOrdersChange={setOrders} onError={setSaveError} /> : tab === 'activity' ? <ActivityTab activity={activity} loading={activityLoading} onRefresh={refreshActivity} onError={setSaveError} /> : tab === 'loyalty' ? <LoyaltyTab config={loyaltyConfig} loading={loyaltyLoading} saving={loyaltySaving} productTypes={siteContent.productTypes} update={setLoyaltyConfig} onSave={saveLoyalty} /> : tab === 'wheel' ? <WheelTab config={wheelConfig} loading={wheelLoading} saving={wheelSaving} update={setWheelConfig} onSave={saveWheel} /> : tab === 'archive' ? <ArchivedProductsTab products={archivedProducts} loading={archiveLoading} onRestore={restoreArchivedProduct} onDeletePermanently={permanentlyDeleteArchived} /> : tab === 'notifications' ? <BroadcastNotificationsTab /> : <ContentTab draft={contentDraft} products={products} update={setContentDraft} onSave={saveContent} readMediaFiles={readMediaFiles} onError={setSaveError} saving={contentSaving} saved={contentSaved} />}
                   </>
                 </motion.aside>
               </>
@@ -371,7 +379,7 @@ function WheelTab({ config, loading, saving, update, onSave }: { config: WheelCo
   </div>;
 }
 
-function ProductsTab({ draft, productTypes, update, onDraftChange, onSave, saving, readImages, onError }: { draft: Product[]; productTypes: string[]; update: (index: number, change: Partial<Product>) => void; onDraftChange: Dispatch<SetStateAction<Product[]>>; onSave: (products?: Product[]) => Promise<void>; saving: boolean; readImages: (files: FileList | null, onRead: (images: string[]) => void) => void; onError: (message: string) => void }) {
+function ProductsTab({ draft, productTypes, update, onDraftChange, onSave, saving, uploadingImages, uploadImages, onError }: { draft: Product[]; productTypes: string[]; update: (index: number, change: Partial<Product>) => void; onDraftChange: Dispatch<SetStateAction<Product[]>>; onSave: (products?: Product[]) => Promise<void>; saving: boolean; uploadingImages: boolean; uploadImages: (files: File[]) => Promise<string[]>; onError: (message: string) => void }) {
   const [newProduct, setNewProduct] = useState<Product>(() => createEmptyProduct(1));
   const [productSection, setProductSection] = useState<'add' | 'existing'>('add');
   const [draggedProductIndex, setDraggedProductIndex] = useState<number | null>(null);
@@ -389,10 +397,14 @@ function ProductsTab({ draft, productTypes, update, onDraftChange, onSave, savin
   };
 
   const updateNewProduct = (change: Partial<Product>) => setNewProduct((current) => ({ ...current, ...change }));
-  const updateNewColors = (colors: Product['colors']) => updateNewProduct({
-    colors,
-    images: colors.flatMap((color) => (color.images?.length ? color.images : [color.image]).filter(Boolean).map((image) => ({ color: color.name, img: image }))),
-    image: colors.find((color) => color.image)?.image || newProduct.image,
+  const updateNewColors = (change: Product['colors'] | ((colors: Product['colors']) => Product['colors'])) => setNewProduct((current) => {
+    const colors = typeof change === 'function' ? change(current.colors) : change;
+    return {
+      ...current,
+      colors,
+      images: colors.flatMap((color) => (color.images?.length ? color.images : [color.image]).filter(Boolean).map((image) => ({ color: color.name, img: image }))),
+      image: colors.find((color) => color.image)?.image || current.image,
+    };
   });
   const addProduct = async () => {
     if (saving || !newProduct.name.trim() || !newProduct.nameAr.trim() || !newProduct.colors.some((color) => color.name.trim() && color.image)) return;
@@ -482,14 +494,14 @@ function ProductsTab({ draft, productTypes, update, onDraftChange, onSave, savin
             <input className="field" value={color.name} onChange={(e) => updateNewColors(newProduct.colors.map((item, index) => index === colorIndex ? { ...item, name: e.target.value } : item))} placeholder="اسم اللون" />
             <button type="button" aria-label="حذف اللون" onClick={() => updateNewColors(newProduct.colors.filter((_, index) => index !== colorIndex))} className="p-2 text-red-500"><Trash2 size={15} /></button>
           </div>
-          <ColorMediaEditor color={color} readImages={readImages} onChange={(nextColor) => updateNewColors(newProduct.colors.map((item, index) => index === colorIndex ? nextColor : item))} />
+          <ColorMediaEditor color={color} uploadImages={uploadImages} onError={onError} onChange={(change) => updateNewColors((current) => current.map((item, index) => index === colorIndex ? change(item) : item))} />
         </div>)}</div>
         <button type="button" onClick={() => updateNewColors([...newProduct.colors, { name: '', available: true, image: '' }])} className="mt-2 text-xs text-moon-face-700">+ إضافة لون</button>
       </div>
 <button 
   type="button" 
   onClick={addProduct} 
-  disabled={saving || !newProduct.name.trim() || !newProduct.nameAr.trim() || !newProduct.colors.some((color) => color.name.trim() && color.image)}
+  disabled={saving || uploadingImages || !newProduct.name.trim() || !newProduct.nameAr.trim() || !newProduct.colors.some((color) => color.name.trim() && color.image)}
   className="w-full mt-4 py-3 rounded-xl bg-[#3B2A22] text-white font-bold shadow-md hover:bg-black transition-colors disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed"
 >
   {saving ? 'جارٍ الحفظ...' : 'إضافة المنتج للقائمة'}
@@ -497,6 +509,18 @@ function ProductsTab({ draft, productTypes, update, onDraftChange, onSave, savin
     {productSection === 'existing' && <div className="space-y-4">{draft.map((product, index) => {
       const colors = product.colors?.length ? product.colors : product.images.map((item) => ({ name: item.color, available: true, image: item.img, images: [item.img] }));
       const setColors = (next: Product['colors']) => update(index, { colors: next, images: next.flatMap((item) => (item.images?.length ? item.images : [item.image]).filter(Boolean).map((image) => ({ color: item.name, img: image }))) });
+      const updateColor = (colorIndex: number, change: (color: Product['colors'][number]) => Product['colors'][number]) => {
+        onDraftChange((current) => current.map((item, itemIndex) => {
+          if (itemIndex !== index) return item;
+          const currentColors = item.colors?.length ? item.colors : item.images.map((image) => ({ name: image.color, available: true, image: image.img, images: [image.img] }));
+          const nextColors = currentColors.map((currentColor, currentIndex) => currentIndex === colorIndex ? change(currentColor) : currentColor);
+          return {
+            ...item,
+            colors: nextColors,
+            images: nextColors.flatMap((currentColor) => (currentColor.images?.length ? currentColor.images : [currentColor.image]).filter(Boolean).map((image) => ({ color: currentColor.name, img: image }))),
+          };
+        }));
+      };
       return <div key={product.id} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const from = Number(event.dataTransfer.getData('text/plain')); if (Number.isInteger(from)) reorderProducts(from, index); }} className={`bg-white rounded-2xl p-4 shadow-sm transition-opacity ${draggedProductIndex === index ? 'opacity-50' : ''}`}>
         <div className="mb-3 flex items-center justify-between border-b border-moon-face-100 pb-2">
           <button type="button" draggable onDragStart={(event) => { setDraggedProductIndex(index); event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', String(index)); }} onDragEnd={() => setDraggedProductIndex(null)} aria-label={`اسحب لتغيير ترتيب ${product.nameAr || product.name}`} title="اسحب لتغيير الترتيب" className="cursor-grab touch-none rounded-md p-2 text-charcoal-500 active:cursor-grabbing"><GripVertical size={19} /></button>
@@ -527,10 +551,10 @@ function ProductsTab({ draft, productTypes, update, onDraftChange, onSave, savin
           </datalist>
         </label>
         <label className="block text-xs text-charcoal-500 mt-3">الصورة الرئيسية للمنتج<input type="file" accept="image/*" className="field mt-1 text-xs" onChange={(e) => readImage(e.target.files?.[0], (image) => update(index, { image }), onError)} /></label>
-        <div className="mt-4 border-t pt-3"><p className="font-bold text-sm mb-2">الألوان والصور والفيديو والتوفر</p><div className="space-y-3">{colors.map((color, colorIndex) => <div key={`${color.name}-${colorIndex}`} className="rounded-xl bg-moon-face-50 p-2"><div className="flex gap-2 items-center"><input className="field" value={color.name} onChange={(e) => setColors(colors.map((item, i) => i === colorIndex ? { ...item, name: e.target.value } : item))} placeholder="اسم اللون" /><button onClick={() => setColors(colors.map((item, i) => i === colorIndex ? { ...item, available: !item.available } : item))} className={`px-3 py-2 rounded-lg text-xs whitespace-nowrap ${color.available ? 'availability-available' : 'availability-unavailable'}`}>{color.available ? 'اللون متوفر' : 'اللون غير متوفر'}</button></div><ColorMediaEditor color={color} readImages={readImages} onChange={(nextColor) => setColors(colors.map((item, i) => i === colorIndex ? nextColor : item))} /></div>)}</div><button onClick={() => setColors([...colors, { name: '', available: true, image: '', images: [], media: [] }])} className="mt-2 text-xs text-moon-face-700">+ إضافة لون</button></div>
+        <div className="mt-4 border-t pt-3"><p className="font-bold text-sm mb-2">الألوان والصور والفيديو والتوفر</p><div className="space-y-3">{colors.map((color, colorIndex) => <div key={`${color.name}-${colorIndex}`} className="rounded-xl bg-moon-face-50 p-2"><div className="flex gap-2 items-center"><input className="field" value={color.name} onChange={(e) => setColors(colors.map((item, i) => i === colorIndex ? { ...item, name: e.target.value } : item))} placeholder="اسم اللون" /><button onClick={() => setColors(colors.map((item, i) => i === colorIndex ? { ...item, available: !item.available } : item))} className={`px-3 py-2 rounded-lg text-xs whitespace-nowrap ${color.available ? 'availability-available' : 'availability-unavailable'}`}>{color.available ? 'اللون متوفر' : 'اللون غير متوفر'}</button></div><ColorMediaEditor color={color} uploadImages={uploadImages} onError={onError} onChange={(change) => updateColor(colorIndex, change)} /></div>)}</div><button onClick={() => setColors([...colors, { name: '', available: true, image: '', images: [], media: [] }])} className="mt-2 text-xs text-moon-face-700">+ إضافة لون</button></div>
       </div>;
     })}</div>}
-    <button disabled={saving} onClick={() => void onSave()} className="w-full mt-6 py-4 rounded-xl bg-[#3B2A22] text-white font-bold transition-opacity disabled:cursor-wait disabled:opacity-60">{saving ? 'جارٍ الحفظ...' : 'حفظ تعديلات المنتجات'}</button>
+    <button disabled={saving || uploadingImages} onClick={() => void onSave()} className="w-full mt-6 py-4 rounded-xl bg-[#3B2A22] text-white font-bold transition-opacity disabled:cursor-wait disabled:opacity-60">{saving ? 'جارٍ الحفظ...' : 'حفظ تعديلات المنتجات'}</button>
   </>;
 }
 
@@ -593,18 +617,43 @@ function ProductMediaEditor({ value, onChange, readMediaFiles }: { value: NonNul
   </div>;
 }
 
-function ColorMediaEditor({ color, onChange, readImages }: { color: Product['colors'][number]; onChange: (color: Product['colors'][number]) => void; readImages: (files: FileList | null, onRead: (images: string[]) => void) => void }) {
+function ColorMediaEditor({ color, onChange, uploadImages, onError }: { color: Product['colors'][number]; onChange: (change: (color: Product['colors'][number]) => Product['colors'][number]) => void; uploadImages: (files: File[]) => Promise<string[]>; onError: (message: string) => void }) {
   const [videoUrl, setVideoUrl] = useState('');
+  const [uploadingUrls, setUploadingUrls] = useState<string[]>([]);
   const imageMedia = (color.images?.length ? color.images : color.image ? [color.image] : []).map((url) => ({ type: 'image' as const, url }));
   const value = [...imageMedia, ...(color.media || [])].filter((item, index, media) => media.findIndex((candidate) => candidate.type === item.type && candidate.url === item.url) === index);
-  const updateMedia = (media: NonNullable<Product['media']>) => {
-    const images = media.filter((item) => item.type === 'image').map((item) => item.url);
-    onChange({ ...color, media, image: images[0] || '', images });
+  const updateMedia = (change: (media: NonNullable<Product['media']>) => NonNullable<Product['media']>) => {
+    onChange((currentColor) => {
+      const currentImages = (currentColor.images?.length ? currentColor.images : currentColor.image ? [currentColor.image] : []).map((url) => ({ type: 'image' as const, url }));
+      const currentMedia = [...currentImages, ...(currentColor.media || [])].filter((item, index, media) => media.findIndex((candidate) => candidate.type === item.type && candidate.url === item.url) === index);
+      const media = change(currentMedia);
+      const images = media.filter((item) => item.type === 'image').map((item) => item.url);
+      return { ...currentColor, media, image: images[0] || '', images };
+    });
   };
   const addVideo = () => {
     if (!isWebUrl(videoUrl)) return;
-    updateMedia([...value, { type: 'video', url: videoUrl.trim() }]);
+    updateMedia((media) => [...media, { type: 'video', url: videoUrl.trim() }]);
     setVideoUrl('');
+  };
+  const addImages = async (files: File[]) => {
+    const previews = files.map((file) => URL.createObjectURL(file));
+    setUploadingUrls((current) => [...current, ...previews]);
+    updateMedia((media) => [...media, ...previews.map((url) => ({ type: 'image' as const, url }))]);
+    try {
+      const uploadedUrls = await uploadImages(files);
+      if (uploadedUrls.length !== previews.length) throw new Error('Image upload count mismatch');
+      const uploadedByPreview = new Map(previews.map((preview, index) => [preview, uploadedUrls[index]]));
+      updateMedia((media) => media.map((item) => item.type === 'image' && uploadedByPreview.has(item.url)
+        ? { ...item, url: uploadedByPreview.get(item.url)! }
+        : item));
+    } catch {
+      updateMedia((media) => media.filter((item) => !previews.includes(item.url)));
+      onError('تعذر رفع صورة أو أكثر لهذا اللون. تحقق من الاتصال وصلاحيات التخزين ثم أعد المحاولة.');
+    } finally {
+      previews.forEach((preview) => URL.revokeObjectURL(preview));
+      setUploadingUrls((current) => current.filter((url) => !previews.includes(url)));
+    }
   };
 
   return <div className="mt-2 space-y-2">
@@ -614,7 +663,7 @@ function ColorMediaEditor({ color, onChange, readImages }: { color: Product['col
       {color.customColor && <button type="button" onClick={() => onChange({ ...color, customColor: undefined })} className="grid size-8 place-items-center rounded-md text-charcoal-500 hover:bg-moon-face-100" aria-label={`استعادة اللون التلقائي ${color.name}`} title="استعادة اللون التلقائي"><RotateCcw size={15} /></button>}
     </label>
     <label className="flex cursor-pointer items-center gap-2 text-xs text-charcoal-500"><ImagePlus size={16} /> إضافة صور لهذا اللون
-      <input type="file" accept="image/*" multiple className="hidden" onChange={(event) => readImages(event.target.files, (images) => updateMedia([...value, ...images.map((url) => ({ type: 'image' as const, url }))]))} />
+      <input type="file" accept="image/*" multiple className="hidden" onChange={(event) => { const files = Array.from(event.currentTarget.files || []).filter((file) => file.type.startsWith('image/')); event.currentTarget.value = ''; if (files.length) void addImages(files); }} />
     </label>
     <div className="flex gap-2">
       <input type="url" dir="ltr" className="field min-w-0" value={videoUrl} onChange={(event) => setVideoUrl(event.target.value)} placeholder="رابط فيديو هذا اللون" aria-label={`رابط فيديو ${color.name || 'اللون'}`} />
@@ -623,7 +672,8 @@ function ColorMediaEditor({ color, onChange, readImages }: { color: Product['col
     {!!value.length && <div className="flex gap-2 overflow-x-auto pb-2">
       {value.map((item, index) => <div key={`${item.type}-${item.url}-${index}`} className="relative h-24 w-20 shrink-0 overflow-hidden rounded-md bg-white">
         <StoredMedia type={item.type} source={item.url} alt={`${color.name || 'اللون'} · ${index + 1}`} controls={item.type === 'video'} className="h-full w-full object-contain" />
-        <button type="button" onClick={() => updateMedia(value.filter((_, itemIndex) => itemIndex !== index))} className="absolute right-1 top-1 grid size-6 place-items-center rounded-full bg-black/70 text-white" aria-label={`حذف وسيط ${color.name} ${index + 1}`}><X size={14} /></button>
+        {uploadingUrls.includes(item.url) && <span className="absolute inset-0 grid place-items-center bg-black/35 text-white"><LoaderCircle size={20} className="animate-spin" /></span>}
+        <button type="button" onClick={() => updateMedia((media) => media.filter((_, itemIndex) => itemIndex !== index))} className="absolute right-1 top-1 grid size-6 place-items-center rounded-full bg-black/70 text-white" aria-label={`حذف وسيط ${color.name} ${index + 1}`}><X size={14} /></button>
       </div>)}
     </div>}
   </div>;
@@ -639,9 +689,7 @@ async function uploadOptimizedImage(file: File) {
 }
 
 async function uploadOptimizedImages(files: File[]) {
-  const urls: string[] = [];
-  for (const file of files) urls.push(await uploadOptimizedImage(file));
-  return urls;
+  return Promise.all(files.map((file) => uploadOptimizedImage(file)));
 }
 
 function ContentTab({ draft, products, update, onSave, readMediaFiles, onError, saving, saved }: { draft: SiteContent; products: Product[]; update: (content: SiteContent) => void; onSave: () => void; readMediaFiles: (files: FileList | null, onRead: (media: NonNullable<Product['media']>) => void) => void; onError: (message: string) => void; saving: boolean; saved: boolean }) {

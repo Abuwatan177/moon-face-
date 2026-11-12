@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type FocusEventHandler, type MouseEventHandler } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type CSSProperties, type FocusEventHandler, type MouseEventHandler } from 'react';
 import { Volume2, VolumeX } from 'lucide-react';
 import useStoredMedia from '../hooks/useStoredMedia';
 import { useLanguage } from '../i18n';
@@ -84,6 +84,32 @@ type Props = {
   onBlur?: FocusEventHandler<HTMLVideoElement>;
 };
 
+export function LazyImage({ source, alt, className = '', style, loading = 'lazy' }: { source: string; alt: string; className?: string; style?: CSSProperties; loading?: 'eager' | 'lazy' }) {
+  const imageRef = useRef<HTMLImageElement | null>(null);
+  const [visibleSource, setVisibleSource] = useState('');
+
+  useEffect(() => {
+    if (loading === 'eager' || !source) return;
+    setVisibleSource('');
+    const image = imageRef.current;
+    if (!image) return;
+    if (!('IntersectionObserver' in window)) {
+      setVisibleSource(source);
+      return;
+    }
+
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) return;
+      setVisibleSource(source);
+      observer.disconnect();
+    }, { rootMargin: '200px 0px', threshold: 0.01 });
+    observer.observe(image);
+    return () => observer.disconnect();
+  }, [loading, source]);
+
+  return <img ref={imageRef} src={loading === 'eager' || visibleSource === source ? source : undefined} alt={alt} className={className} style={style} loading={loading} decoding="async" />;
+}
+
 const StoredMedia = forwardRef<HTMLVideoElement, Props>(function StoredMedia({ type, source, alt, className = '', controls = false, autoPlay = false, autoPlayWhenVisible = false, muted = false, loop = false, onMouseEnter, onMouseLeave, onFocus, onBlur }, ref) {
   const { t } = useLanguage();
   const resolvedSource = useStoredMedia(source);
@@ -151,7 +177,7 @@ const StoredMedia = forwardRef<HTMLVideoElement, Props>(function StoredMedia({ t
 
   return type === 'video'
     ? <video ref={(node) => { videoRef.current = node; visibilityTargetRef.current = node; }} src={resolvedSource} aria-label={alt} className={className} controls={controls} autoPlay={shouldAutoPlay} muted={muted || shouldAutoPlay} loop={loop || shouldAutoPlay} playsInline preload="metadata" onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave} onFocus={onFocus} onBlur={onBlur} onClick={(event) => event.stopPropagation()} />
-    : <img src={resolvedSource} alt={alt} className={className} loading="lazy" />;
+    : <LazyImage source={resolvedSource} alt={alt} className={className} />;
 });
 
 export default StoredMedia;

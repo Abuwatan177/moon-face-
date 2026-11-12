@@ -361,8 +361,8 @@ export default function App() {
     const savedOrdered = normalizeProducts(saved).sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
     setProducts(savedOrdered);
     try {
-      const archivedProducts = await loadArchivedProducts();
-      const retainedMedia = collectStoredMedia([...ordered, ...archivedProducts]);
+      const [archivedProducts, savedSiteContent] = await Promise.all([loadArchivedProducts(), loadSiteContent()]);
+      const retainedMedia = collectStoredMedia([ordered, archivedProducts, savedSiteContent]);
       const cleanupResults = await Promise.allSettled([...previousMedia].filter((url) => !retainedMedia.has(url)).map(deleteStoredMedia));
       if (cleanupResults.some((result) => result.status === 'rejected')) throw new Error();
     } catch {
@@ -374,7 +374,8 @@ export default function App() {
     await persistSiteContent(merged);
     setSiteContent(merged);
     const previousMedia = collectStoredMedia(siteContent);
-    const retainedMedia = collectStoredMedia(merged);
+    const archivedProducts = await loadArchivedProducts();
+    const retainedMedia = collectStoredMedia([merged, products, archivedProducts]);
     const cleanupResults = await Promise.allSettled([...previousMedia].filter((url) => !retainedMedia.has(url)).map(deleteStoredMedia));
     if (cleanupResults.some((result) => result.status === 'rejected')) {
       throw new Error('تم حفظ محتوى المتجر في قاعدة البيانات، لكن تعذر حذف بعض الوسائط القديمة من التخزين.');

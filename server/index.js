@@ -12,6 +12,8 @@ const missingSupabaseVariables = [
 const supabase = missingSupabaseVariables.length ? null : createClient(supabaseUrl, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
+const mediaBucket = 'store-media';
+const mediaCleanupGraceMs = 48 * 60 * 60 * 1000;
 const app = express();
 const port = Number(process.env.API_PORT || 3001);
 const casperLogin = process.env.CASPER_LOGIN?.trim();
@@ -627,6 +629,111 @@ const runAbandonedCartReminderJob = async (request, response) => {
 };
 app.get('/api/cron/abandoned-cart-reminders', runAbandonedCartReminderJob);
 app.post('/api/cron/abandoned-cart-reminders', runAbandonedCartReminderJob);
+
+function referencedMediaPaths(value, paths = new Set()) {
+  if (typeof value === 'string') {
+    try {
+      const pathname = new URL(value).pathname;
+      const marker = '/storage/v1/object/';
+      const markerIndex = pathname.indexOf(marker);
+      if (markerIndex < 0) return paths;
+      const segments = pathname.slice(markerIndex + marker.length).split('/');
+      const [access, bucket, ...objectPath] = segments;
+      if (!['public', 'sign', 'authenticated'].includes(access) || bucket !== mediaBucket || !objectPath.length) return paths;
+      paths.add(decodeURIComponent(objectPath.join('/')));
+    } catch {
+      return paths;
+    }
+  } else if (Array.isArray(value)) {
+    value.forEach((item) => referencedMediaPaths(item, paths));
+  } else if (value && typeof value === 'object') {
+    Object.values(value).forEach((item) => referencedMediaPaths(item, paths));
+  }
+  return paths;
+}
+
+async function listMediaObjects(prefix = '') {
+  const objects = [];
+  let offset = 0;
+  while (true) {
+    const { data, error } = await supabase.storage.from(mediaBucket).list(prefix, {
+      limit: 100,
+      offset,
+      sortBy: { column: 'name', order: 'asc' },
+    });
+    if (error) throw new Error(`Could not list storage objects: ${error.message}`);
+
+    for (const item of data || []) {
+      const path = prefix ? `${prefix}/${item.name}` : item.name;
+      if (item.id === null && item.metadata === null) {
+        objects.push(...await listMediaObjects(path));
+      } else {
+        objects.push({ path, createdAt: item.created_at || item.updated_at, metadata: item.metadata });
+      }
+    }
+
+    if (!data || data.length < 100) break;
+    offset += 100;
+  }
+  return objects;
+}
+
+function isImageObject(object) {
+  return object.metadata?.mimetype?.startsWith('image/')
+    || /\.(?:jpe?g|png|gif|webp|svg|avif|tiff?|bmp|heic|heif)$/i.test(object.path);
+}
+
+async function removeUnusedStoreImages(dryRun = false) {
+  const { data: settings, error } = await supabase.from('store_settings').select('key,value');
+  if (error) throw new Error(`Could not read store settings: ${error.message}`);
+
+  const productCatalog = settings?.find((setting) => setting.key === 'products')?.value;
+  const siteContent = settings?.find((setting) => setting.key === 'site_content')?.value;
+  if (!Array.isArray(productCatalog) || !siteContent || typeof siteContent !== 'object' || Array.isArray(siteContent)) {
+    throw new Error('Store product and content settings are incomplete; no media was removed.');
+  }
+
+  const retainedPaths = referencedMediaPaths(settings.map((setting) => setting.value));
+  const cutoff = Date.now() - mediaCleanupGraceMs;
+  const objects = await listMediaObjects();
+  const unusedImages = objects.filter((object) => {
+    if (!isImageObject(object) || retainedPaths.has(object.path)) return false;
+    const createdAt = Date.parse(object.createdAt || '');
+    return Number.isFinite(createdAt) && createdAt < cutoff;
+  });
+
+  let deleted = 0;
+  if (!dryRun) {
+    for (let start = 0; start < unusedImages.length; start += 100) {
+      const paths = unusedImages.slice(start, start + 100).map((object) => object.path);
+      const { error: deleteError } = await supabase.storage.from(mediaBucket).remove(paths);
+      if (deleteError) throw new Error(`Could not remove unused images: ${deleteError.message}`);
+      deleted += paths.length;
+    }
+  }
+
+  return {
+    scanned: objects.length,
+    retained: retainedPaths.size,
+    unusedImages: unusedImages.length,
+    deleted,
+    dryRun,
+  };
+}
+
+const runUnusedMediaCleanup = async (request, response) => {
+  if (!cronJobToken) return response.status(503).json({ error: 'Cron job authentication is not configured.' });
+  if (!isAuthorizedCronRequest(request)) return response.status(401).json({ error: 'Unauthorized.' });
+  try {
+    const result = await removeUnusedStoreImages(request.query.dryRun === 'true');
+    response.json({ ok: true, ...result });
+  } catch (error) {
+    logLimitedError('unused-media-cleanup', 'Unused media cleanup failed:', error.message);
+    response.status(500).json({ error: 'Unused media cleanup failed; no further files were removed.' });
+  }
+};
+app.get('/api/cron/cleanup-unused-media', runUnusedMediaCleanup);
+app.post('/api/cron/cleanup-unused-media', runUnusedMediaCleanup);
 
 app.post('/api/admin/notifications', async (request, response, next) => {
   try {

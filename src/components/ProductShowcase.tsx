@@ -5,7 +5,7 @@ import AnimatedActionButton from './AnimatedActionButton';
 import MediaCarousel from './MediaCarousel';
 import ProductEngagement from './ProductEngagement';
 import TutorialsSection from './TutorialsSection';
-import StoredMedia from './StoredMedia';
+import StoredMedia, { LazyImage } from './StoredMedia';
 import { useScrollReveal } from '../hooks/useScrollReveal';
 import type { Product } from '../data/products';
 import type { SiteContent } from '../data/siteContent';
@@ -231,7 +231,7 @@ export default function ProductShowcase({ products: initialProducts, productType
           <nav ref={typeRailRef} aria-label={t('productTypeFilter')} dir={language === 'en' ? 'ltr' : 'rtl'} className="filter-rail snap-x snap-mandatory items-start">
           {typeOptions.map((type) => <button key={type.value} type="button" onClick={() => { setActiveType(type.value); setCurrentPage(1); setSelectedProductId(null); document.getElementById('products')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }} aria-pressed={activeType === type.value} className={`group relative isolate aspect-[1.55/1] w-[18rem] shrink-0 snap-start overflow-hidden rounded-xl border text-start shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg max-[380px]:w-[78vw] sm:w-80 ${activeType === type.value ? 'border-[#68704B] ring-2 ring-[#68704B]/35' : 'border-[#a56c4f]/35'}`}>
             {type.image ? <>
-              <img src={type.image} alt="" loading="lazy" decoding="async" className="absolute inset-0 z-10 h-full w-full object-cover" style={{ objectPosition: `${type.positionX}% ${type.positionY}%`, transform: `scale(${type.zoom / 100})` }} />
+              <LazyImage source={type.image} alt="" className="absolute inset-0 z-10 h-full w-full object-cover" style={{ objectPosition: `${type.positionX}% ${type.positionY}%`, transform: `scale(${type.zoom / 100})` }} />
             </> : <div className="absolute inset-0 bg-[#514332]" />}
             <span aria-hidden="true" className="absolute inset-0 z-20 bg-gradient-to-t from-[#2E241D]/90 via-[#2E241D]/25 to-[#2E241D]/5" />
             <span aria-hidden="true" className="absolute inset-0 z-30" style={{ background: 'linear-gradient(125deg, rgba(255,255,255,.52) 0%, rgba(255,255,255,.1) 27%, transparent 43%, rgba(255,255,255,.16) 70%, transparent 100%)' }} />

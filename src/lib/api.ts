@@ -279,6 +279,13 @@ function productMediaUrls(product: Product) {
   ].filter((url): url is string => typeof url === 'string' && url.length > 0))];
 }
 
+function storedMediaUrls(value: unknown, urls = new Set<string>()): Set<string> {
+  if (typeof value === 'string' && value.includes('/storage/v1/object/public/store-media/')) urls.add(value);
+  else if (Array.isArray(value)) value.forEach((item) => storedMediaUrls(item, urls));
+  else if (value && typeof value === 'object') Object.values(value).forEach((item) => storedMediaUrls(item, urls));
+  return urls;
+}
+
 export async function saveProducts(products: Product[]) {
   const existing = await readProductCatalog();
   const active = products.map((product, displayOrder) => ({ ...product, isArchived: false, displayOrder }));
@@ -297,7 +304,8 @@ export async function permanentlyDeleteArchivedProduct(productId: number) {
   const target = catalog.find((product) => product.id === productId);
   if (!target || target.isArchived !== true) throw new Error('لا يمكن حذف منتج غير مؤرشف.');
   const remaining = catalog.filter((product) => product.id !== productId);
-  const retainedMedia = new Set(remaining.flatMap(productMediaUrls));
+  const siteContent = await loadSiteContent();
+  const retainedMedia = new Set([...remaining.flatMap(productMediaUrls), ...storedMediaUrls(siteContent)]);
   const unusedMedia = productMediaUrls(target).filter((url) => !retainedMedia.has(url));
   await writeProductCatalog(remaining);
   const cleanupResults = await Promise.allSettled(unusedMedia.map(deleteStoredMedia));
