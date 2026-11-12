@@ -12,6 +12,7 @@ import type { SiteContent } from '../data/siteContent';
 import type { WishlistItem } from '../App';
 import { normalizeProductType, translateProductBadge, translateProductColor, translateProductType, useLanguage } from '../i18n';
 import { getProductColorStyle } from '../utils/productColors';
+import { getProductImageUrl, getProductImageUrls } from '../utils/productImages';
 import { readRecentlyViewedProductIds, trackRecentlyViewedProduct } from '../utils/recentlyViewed';
 import { usePageMetadata } from '../hooks/usePageMetadata';
 import { getProductShareUrl } from '../lib/api';
@@ -21,16 +22,20 @@ const hasAvailableVariant = (product: Product) => product.colors.some((color) =>
 
 function mediaForColor(product: Product, colorName: string): NonNullable<Product['media']> {
   const color = product.colors?.find((item) => item.name === colorName);
-  const colorImages = color?.images?.length
-    ? color.images
-    : product.images.filter((item) => item.color === colorName).map((item) => item.img);
-  const imageUrls = colorImages.length ? colorImages : color?.image ? [color.image] : [];
-  const colorMedia = color?.media || [];
+  const colorImages = getProductImageUrls(color?.images);
+  const legacyImages = (Array.isArray(product.images) ? product.images : [])
+    .filter((item) => item.color === colorName)
+    .map((item) => getProductImageUrl(item.img))
+    .filter(Boolean);
+  const colorImage = getProductImageUrl(color?.image);
+  const imageUrls = colorImages.length ? colorImages : legacyImages.length ? legacyImages : colorImage ? [colorImage] : [];
+  const colorMedia = (color?.media || []).map((item) => ({ ...item, url: getProductImageUrl(item.url) }));
+  const productMedia = (product.media || []).map((item) => ({ ...item, url: getProductImageUrl(item.url) }));
 
   const rawMedia = [
     ...imageUrls.map((url) => ({ type: 'image' as const, url })),
     ...colorMedia,
-    ...(product.media || []),
+    ...productMedia,
   ].filter((item, index, media) => item.url && media.findIndex((candidate) => candidate.type === item.type && candidate.url === item.url) === index);
 
   return rawMedia;
@@ -62,7 +67,7 @@ export function ProductCard({ product, index, onAdd, liked, onToggleWishlist, se
   const isOffer = variant === 'offer';
   const cardRef = useRef<HTMLDivElement>(null);
   const cardInView = useInView(cardRef, { once: true, margin: '0px 0px -8% 0px' });
-  const colorOptions: Product['colors'] = product.colors?.length ? product.colors : product.images.map((item) => ({ name: item.color, image: item.img, available: true }));
+  const colorOptions: Product['colors'] = product.colors?.length ? product.colors : (Array.isArray(product.images) ? product.images : []).map((item) => ({ name: item.color, image: getProductImageUrl(item.img), available: true }));
   const colors = [...colorOptions].sort((first, second) => Number(second.available) - Number(first.available));
   
   const [selectedColor, setSelectedColor] = useState(colors[0]?.name || '');
@@ -313,7 +318,7 @@ function ProductDetails({ product, products, liked, onClose, onAdd, onToggleWish
   onSelectProduct: (productId: number) => void;
 }) {
   const { language, t } = useLanguage();
-  const colorOptions: Product['colors'] = product.colors?.length ? product.colors : product.images.map((item) => ({ name: item.color, image: item.img, available: true }));
+  const colorOptions: Product['colors'] = product.colors?.length ? product.colors : (Array.isArray(product.images) ? product.images : []).map((item) => ({ name: item.color, image: getProductImageUrl(item.img), available: true }));
   const colors = [...colorOptions].sort((first, second) => Number(second.available) - Number(first.available));
   const [selectedColor, setSelectedColor] = useState(colors[0]?.name || '');
   const [shareNotice, setShareNotice] = useState('');

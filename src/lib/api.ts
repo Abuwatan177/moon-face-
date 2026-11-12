@@ -7,6 +7,7 @@ import type { SiteContent } from '../data/siteContent';
 import { deleteLocalMedia, saveLocalMedia } from './localMedia';
 import { subscribeWithOneSignal } from './oneSignal';
 import { supabase } from './supabase';
+import { getFinalProductImageUrl, getFinalProductImageUrls } from '../utils/productImages';
 
 export type StoreOrder = {
   id: number;
@@ -279,6 +280,40 @@ function productMediaUrls(product: Product) {
   ].filter((url): url is string => typeof url === 'string' && url.length > 0))];
 }
 
+function sanitizeProductImages(product: Product): Product {
+  const colors = (Array.isArray(product.colors) ? product.colors : []).map((color) => {
+    const images = getFinalProductImageUrls(color.images);
+    const image = getFinalProductImageUrl(color.image) || images[0] || '';
+    const media = Array.isArray(color.media)
+      ? color.media.map((item) => ({ ...item, url: getFinalProductImageUrl(item.url) })).filter((item) => item.url)
+      : [];
+    return { ...color, image, images, media };
+  });
+  const savedImages = Array.isArray(product.images)
+    ? product.images.map((entry) => {
+      const item = entry && typeof entry === 'object' ? entry as { color?: unknown; img?: unknown } : null;
+      return {
+        color: typeof item?.color === 'string' ? item.color : '',
+        img: getFinalProductImageUrl(item?.img ?? entry),
+      };
+    }).filter((item) => item.img)
+    : [];
+  const images = colors.length
+    ? colors.flatMap((color) => (color.images.length ? color.images : [color.image]).filter(Boolean).map((img) => ({ color: color.name, img })))
+    : savedImages;
+  const media = Array.isArray(product.media)
+    ? product.media.map((item) => ({ ...item, url: getFinalProductImageUrl(item.url) })).filter((item) => item.url)
+    : [];
+
+  return {
+    ...product,
+    image: getFinalProductImageUrl(product.image) || images[0]?.img || '',
+    images,
+    colors,
+    media,
+  };
+}
+
 function storedMediaUrls(value: unknown, urls = new Set<string>()): Set<string> {
   if (typeof value === 'string' && value.includes('/storage/v1/object/public/store-media/')) urls.add(value);
   else if (Array.isArray(value)) value.forEach((item) => storedMediaUrls(item, urls));
@@ -288,11 +323,11 @@ function storedMediaUrls(value: unknown, urls = new Set<string>()): Set<string> 
 
 export async function saveProducts(products: Product[]) {
   const existing = await readProductCatalog();
-  const active = products.map((product, displayOrder) => ({ ...product, isArchived: false, displayOrder }));
+  const active = products.map((product, displayOrder) => ({ ...sanitizeProductImages(product), isArchived: false, displayOrder }));
   const activeIds = new Set(active.map((product) => product.id));
   const archived = existing
     .filter((product) => !activeIds.has(product.id))
-    .map((product) => ({ ...product, isArchived: true }));
+    .map((product) => ({ ...sanitizeProductImages(product), isArchived: true }));
   const saved = await writeProductCatalog([...active, ...archived]);
   const activeProducts = saved.filter((product) => product.isArchived !== true);
   rememberReadCache('products:public', activeProducts, PUBLIC_DATA_CACHE_TTL_MS);

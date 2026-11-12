@@ -22,6 +22,7 @@ import { defaultSiteContent, type SiteContent } from './data/siteContent';
 import { normalizeProductType, useLanguage } from './i18n';
 import { playStoreSound } from './utils/storeSounds';
 import { toWebpStorageUrl } from './utils/media';
+import { getProductImageUrl, getProductImageUrls } from './utils/productImages';
 
 export type WishlistItem = Product & { selectedColor: string };
 
@@ -44,17 +45,23 @@ const normalizeProducts = (items: unknown): Product[] => {
     .filter((item): item is Partial<Product> => Boolean(item && typeof item === 'object'))
     .map((product) => {
       const images = Array.isArray(product.images)
-        ? product.images.filter((image): image is { color: string; img: string } => Boolean(image?.img) && !isRetiredBundledMedia(image.img))
+        ? product.images.map((entry) => {
+          const item = entry && typeof entry === 'object' ? entry as { color?: unknown; img?: unknown } : null;
+          return { color: typeof item?.color === 'string' ? item.color : '', img: getProductImageUrl(item?.img ?? entry) };
+        }).filter((image) => image.img && !isRetiredBundledMedia(image.img))
         : [];
       const colors = Array.isArray(product.colors)
         ? product.colors.filter((color): color is Product['colors'][number] => Boolean(color?.name)).map((color) => ({
           ...color,
-          image: isRetiredBundledMedia(color.image) ? '' : color.image,
-          images: (color.images || []).filter((image) => !isRetiredBundledMedia(image)),
-          media: color.media?.filter((media) => !isRetiredBundledMedia(media.url)),
+          image: getProductImageUrl(color.image) && !isRetiredBundledMedia(getProductImageUrl(color.image)) ? getProductImageUrl(color.image) : '',
+          images: getProductImageUrls(color.images).filter((image) => !isRetiredBundledMedia(image)),
+          media: Array.isArray(color.media)
+            ? color.media.map((media) => ({ ...media, url: getProductImageUrl(media.url) })).filter((media) => media.url && !isRetiredBundledMedia(media.url))
+            : [],
         }))
         : images.map((image) => ({ name: image.color, available: true, image: image.img }));
-      const image = (product.image && !isRetiredBundledMedia(product.image) ? product.image : '') || images[0]?.img || colors[0]?.image || '';
+      const productImage = getProductImageUrl(product.image);
+      const image = (productImage && !isRetiredBundledMedia(productImage) ? productImage : '') || images[0]?.img || colors[0]?.image || '';
       const storedProductType = typeof product.productType === 'string' ? product.productType.trim() : '';
       const knownDefaultProduct = defaultProducts.find((item) => item.id === Number(product.id) && item.name === product.name);
       const productType = (!storedProductType || normalizeProductType(storedProductType) === 'hijabs') && knownDefaultProduct

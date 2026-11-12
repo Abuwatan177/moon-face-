@@ -4,6 +4,7 @@ import { Archive, Check, ChevronDown, ChevronUp, Download, Eye, GripVertical, Im
 import type { Product } from '../data/products';
 import type { SiteContent } from '../data/siteContent';
 import { getProductColorHex } from '../utils/productColors';
+import { getFinalProductImageUrl, getFinalProductImageUrls, getProductImageUrl, getProductImageUrls } from '../utils/productImages';
 import { toWebpStorageUrl } from '../utils/media';
 import { optimizeImage } from '../utils/optimizeImage';
 import { useAuth } from '../context/AuthContext';
@@ -402,15 +403,19 @@ function ProductsTab({ draft, productTypes, update, onDraftChange, onSave, savin
     return {
       ...current,
       colors,
-      images: colors.flatMap((color) => (color.images?.length ? color.images : [color.image]).filter(Boolean).map((image) => ({ color: color.name, img: image }))),
-      image: colors.find((color) => color.image)?.image || current.image,
+      images: colors.flatMap((color) => (getProductImageUrls(color.images).length ? getProductImageUrls(color.images) : [getProductImageUrl(color.image)]).filter(Boolean).map((image) => ({ color: color.name, img: image }))),
+      image: colors.map((color) => getProductImageUrl(color.image)).find(Boolean) || getProductImageUrl(current.image),
     };
   });
   const addProduct = async () => {
-    if (saving || !newProduct.name.trim() || !newProduct.nameAr.trim() || !newProduct.colors.some((color) => color.name.trim() && color.image)) return;
+    if (saving || uploadingImages || !newProduct.name.trim() || !newProduct.nameAr.trim() || !newProduct.colors.some((color) => color.name.trim() && (getFinalProductImageUrl(color.image) || getFinalProductImageUrls(color.images).length))) return;
     const colors = newProduct.colors
-      .filter((color) => color.name.trim() && color.image)
-      .map((color) => ({ ...color, name: color.name.trim(), images: color.images?.length ? color.images : [color.image] }));
+      .filter((color) => color.name.trim() && (getFinalProductImageUrl(color.image) || getFinalProductImageUrls(color.images).length))
+      .map((color) => {
+        const images = getFinalProductImageUrls(color.images);
+        const image = getFinalProductImageUrl(color.image) || images[0] || '';
+        return { ...color, name: color.name.trim(), image, images: images.length ? images : [image] };
+      });
     const images = colors.flatMap((color) => color.images!.map((image) => ({ color: color.name, img: image })));
     const product = {
       ...newProduct,
@@ -501,23 +506,23 @@ function ProductsTab({ draft, productTypes, update, onDraftChange, onSave, savin
 <button 
   type="button" 
   onClick={addProduct} 
-  disabled={saving || uploadingImages || !newProduct.name.trim() || !newProduct.nameAr.trim() || !newProduct.colors.some((color) => color.name.trim() && color.image)}
+  disabled={saving || uploadingImages || !newProduct.name.trim() || !newProduct.nameAr.trim() || !newProduct.colors.some((color) => color.name.trim() && (getFinalProductImageUrl(color.image) || getFinalProductImageUrls(color.images).length))}
   className="w-full mt-4 py-3 rounded-xl bg-[#3B2A22] text-white font-bold shadow-md hover:bg-black transition-colors disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed"
 >
   {saving ? 'جارٍ الحفظ...' : 'إضافة المنتج للقائمة'}
 </button>    </div>}
     {productSection === 'existing' && <div className="space-y-4">{draft.map((product, index) => {
-      const colors = product.colors?.length ? product.colors : product.images.map((item) => ({ name: item.color, available: true, image: item.img, images: [item.img] }));
-      const setColors = (next: Product['colors']) => update(index, { colors: next, images: next.flatMap((item) => (item.images?.length ? item.images : [item.image]).filter(Boolean).map((image) => ({ color: item.name, img: image }))) });
+      const colors = product.colors?.length ? product.colors : (Array.isArray(product.images) ? product.images : []).map((item) => ({ name: item.color, available: true, image: getProductImageUrl(item.img), images: [getProductImageUrl(item.img)] }));
+      const setColors = (next: Product['colors']) => update(index, { colors: next, images: next.flatMap((item) => (getProductImageUrls(item.images).length ? getProductImageUrls(item.images) : [getProductImageUrl(item.image)]).filter(Boolean).map((image) => ({ color: item.name, img: image }))) });
       const updateColor = (colorIndex: number, change: (color: Product['colors'][number]) => Product['colors'][number]) => {
         onDraftChange((current) => current.map((item, itemIndex) => {
           if (itemIndex !== index) return item;
-          const currentColors = item.colors?.length ? item.colors : item.images.map((image) => ({ name: image.color, available: true, image: image.img, images: [image.img] }));
+          const currentColors = item.colors?.length ? item.colors : (Array.isArray(item.images) ? item.images : []).map((image) => ({ name: image.color, available: true, image: getProductImageUrl(image.img), images: [getProductImageUrl(image.img)] }));
           const nextColors = currentColors.map((currentColor, currentIndex) => currentIndex === colorIndex ? change(currentColor) : currentColor);
           return {
             ...item,
             colors: nextColors,
-            images: nextColors.flatMap((currentColor) => (currentColor.images?.length ? currentColor.images : [currentColor.image]).filter(Boolean).map((image) => ({ color: currentColor.name, img: image }))),
+            images: nextColors.flatMap((currentColor) => (getProductImageUrls(currentColor.images).length ? getProductImageUrls(currentColor.images) : [getProductImageUrl(currentColor.image)]).filter(Boolean).map((image) => ({ color: currentColor.name, img: image }))),
           };
         }));
       };
@@ -620,11 +625,13 @@ function ProductMediaEditor({ value, onChange, readMediaFiles }: { value: NonNul
 function ColorMediaEditor({ color, onChange, uploadImages, onError }: { color: Product['colors'][number]; onChange: (change: (color: Product['colors'][number]) => Product['colors'][number]) => void; uploadImages: (files: File[]) => Promise<string[]>; onError: (message: string) => void }) {
   const [videoUrl, setVideoUrl] = useState('');
   const [uploadingUrls, setUploadingUrls] = useState<string[]>([]);
-  const imageMedia = (color.images?.length ? color.images : color.image ? [color.image] : []).map((url) => ({ type: 'image' as const, url }));
+  const imageUrls = getProductImageUrls(color.images);
+  const imageMedia = (imageUrls.length ? imageUrls : [getProductImageUrl(color.image)].filter(Boolean)).map((url) => ({ type: 'image' as const, url }));
   const value = [...imageMedia, ...(color.media || [])].filter((item, index, media) => media.findIndex((candidate) => candidate.type === item.type && candidate.url === item.url) === index);
   const updateMedia = (change: (media: NonNullable<Product['media']>) => NonNullable<Product['media']>) => {
     onChange((currentColor) => {
-      const currentImages = (currentColor.images?.length ? currentColor.images : currentColor.image ? [currentColor.image] : []).map((url) => ({ type: 'image' as const, url }));
+      const currentImageUrls = getProductImageUrls(currentColor.images);
+      const currentImages = (currentImageUrls.length ? currentImageUrls : [getProductImageUrl(currentColor.image)].filter(Boolean)).map((url) => ({ type: 'image' as const, url }));
       const currentMedia = [...currentImages, ...(currentColor.media || [])].filter((item, index, media) => media.findIndex((candidate) => candidate.type === item.type && candidate.url === item.url) === index);
       const media = change(currentMedia);
       const images = media.filter((item) => item.type === 'image').map((item) => item.url);
