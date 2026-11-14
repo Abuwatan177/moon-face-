@@ -6,7 +6,7 @@ import type { SiteContent } from '../data/siteContent';
 import { getProductColorHex } from '../utils/productColors';
 import { getFinalProductImageUrl, getFinalProductImageUrls, getProductImageUrl, getProductImageUrls } from '../utils/productImages';
 import { toWebpStorageUrl } from '../utils/media';
-import { isImageFile, optimizeImageForUpload } from '../utils/optimizeImage';
+import { optimizeImageForUpload } from '../utils/optimizeImage';
 import { useAuth } from '../context/AuthContext';
 import { loadArchivedProducts as loadArchivedProductsFromApi, loadLoyaltyConfig, loadWheelConfig, permanentlyDeleteArchivedProduct, saveLoyaltyConfig, saveWheelConfig, saveUploadedMedia, sendAdminBroadcastNotification, type LoyaltyCampaign, type LoyaltyConfig, type WheelConfig, type WheelSlice } from '../lib/api';
 import StoredMedia, { LazyImage } from './StoredMedia';
@@ -163,7 +163,7 @@ export default function AdminPanel({ products, onSave, siteContent, onSaveSiteCo
   };
 
   const readMediaFiles = (files: FileList | null, onRead: (media: NonNullable<Product['media']>) => void) => {
-    const images = Array.from(files || []).filter(isImageFile);
+    const images = Array.from(files || []);
     if (!images.length) return;
     void uploadProductImages(images)
       .then((urls) => onRead(urls.map((url) => ({ type: 'image' as const, url }))))
@@ -695,7 +695,7 @@ function ColorMediaEditor({ color, onChange, uploadImages, onError }: { color: P
       {color.customColor && <button type="button" onClick={() => onChange((currentColor) => ({ ...currentColor, customColor: undefined }))} className="grid size-8 place-items-center rounded-md text-charcoal-500 hover:bg-moon-face-100" aria-label={`استعادة اللون التلقائي ${color.name}`} title="استعادة اللون التلقائي"><RotateCcw size={15} /></button>}
     </label>
     <label className="flex cursor-pointer items-center gap-2 text-xs text-charcoal-500"><ImagePlus size={16} /> إضافة صور لهذا اللون
-      <input type="file" accept="image/*" multiple className="hidden" onChange={(event) => { const files = Array.from(event.currentTarget.files || []).filter(isImageFile); event.currentTarget.value = ''; if (files.length) void addImages(files); }} />
+      <input type="file" accept="image/*" multiple className="hidden" onChange={(event) => { const files = Array.from(event.currentTarget.files || []); event.currentTarget.value = ''; if (files.length) void addImages(files); }} />
     </label>
     <div className="flex gap-2">
       <input type="url" dir="ltr" className="field min-w-0" value={videoUrl} onChange={(event) => setVideoUrl(event.target.value)} placeholder="رابط فيديو هذا اللون" aria-label={`رابط فيديو ${color.name || 'اللون'}`} />

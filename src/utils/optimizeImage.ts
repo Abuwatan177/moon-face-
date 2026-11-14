@@ -1,10 +1,8 @@
 const MAX_DIMENSION = 1000;
-const MAX_OUTPUT_BYTES = 180 * 1024;
-const FIRST_QUALITY = 0.78;
-const RETRY_QUALITY = 0.68;
+const MAX_UNDECODED_IMAGE_BYTES = 4 * 1024 * 1024;
 
 export function isImageFile(file: File) {
-  return file.type.startsWith('image/') || /\.(?:jpe?g|png|gif|webp|avif|bmp|heic|heif|tiff?)$/i.test(file.name);
+  return file.type.startsWith('image/') || /\.(?:jpe?g|jfif|png|apng|gif|webp|avif|bmp|dib|heic|heif|hif|tiff?|svg|ico|cur|jxl|psd|dng|cr2|nef|arw|raw|orf|rw2|pef|srw)$/i.test(file.name);
 }
 
 async function loadImage(file: File) {
@@ -58,7 +56,15 @@ async function loadImage(file: File) {
 
 export async function optimizeImageForUpload(file: File): Promise<Blob> {
   if (!isImageFile(file)) throw new Error('الملف المحدد ليس صورة.');
-  const image = await loadImage(file);
+  let image: Awaited<ReturnType<typeof loadImage>>;
+  try {
+    image = await loadImage(file);
+  } catch (error) {
+    if (file.size > MAX_UNDECODED_IMAGE_BYTES) {
+      throw new Error('هذا الجهاز لا يستطيع فتح صيغة الصورة المحددة وحجمها كبير. احفظها بصيغة JPG أو PNG ثم أعد رفعها.', { cause: error });
+    }
+    return new Blob([file], { type: file.type || 'application/octet-stream' });
+  }
   try {
     const scale = Math.min(1, MAX_DIMENSION / Math.max(image.width, image.height));
     const canvas = document.createElement('canvas');
@@ -68,17 +74,6 @@ export async function optimizeImageForUpload(file: File): Promise<Blob> {
     if (!context) throw new Error('تعذر تجهيز الصورة على هذا الجهاز.');
 
     context.drawImage(image.source, 0, 0, canvas.width, canvas.height);
-    const encode = (quality: number) => new Promise<Blob | null>((resolve) => {
-      canvas.toBlob(resolve, 'image/webp', quality);
-    });
-    const firstPass = await encode(FIRST_QUALITY);
-    if (firstPass?.type === 'image/webp' && firstPass.size <= MAX_OUTPUT_BYTES) return firstPass;
-
-    if (firstPass?.type === 'image/webp') {
-      const secondPass = await encode(RETRY_QUALITY);
-      if (secondPass?.type === 'image/webp') return secondPass;
-    }
-
     const fallback = await new Promise<Blob | null>((resolve) => {
       canvas.toBlob(resolve, 'image/png');
     });
@@ -89,5 +84,4 @@ export async function optimizeImageForUpload(file: File): Promise<Blob> {
   }
 }
 
-export const smartCompressToWebP = optimizeImageForUpload;
 export const optimizeImage = optimizeImageForUpload;
