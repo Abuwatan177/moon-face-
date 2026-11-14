@@ -111,9 +111,25 @@ create table if not exists public.orders (
   customer_address text not null,
   region text not null,
   payload jsonb not null,
+  products_total numeric(12,2) not null default 0,
+  shipping_fee numeric(12,2) not null default 0,
+  payment_method text not null default 'CASH_ON_DELIVERY',
+  payment_status text not null default 'UNPAID_AT_DELIVERY',
+  currency text not null default 'ILS',
+  gateway_session_id text,
+  gateway_transaction_id text,
   status text not null default 'new' check (status in ('new','cancelled','postponed','delivered','exchanged')),
   created_at timestamptz not null default now()
 );
+alter table public.orders add column if not exists products_total numeric(12,2) not null default 0;
+alter table public.orders add column if not exists shipping_fee numeric(12,2) not null default 0;
+alter table public.orders add column if not exists payment_method text not null default 'CASH_ON_DELIVERY';
+alter table public.orders add column if not exists payment_status text not null default 'UNPAID_AT_DELIVERY';
+alter table public.orders add column if not exists currency text not null default 'ILS';
+alter table public.orders add column if not exists gateway_session_id text;
+alter table public.orders add column if not exists gateway_transaction_id text;
+create unique index if not exists orders_gateway_session_id_idx on public.orders(gateway_session_id) where gateway_session_id is not null;
+create unique index if not exists orders_gateway_transaction_id_idx on public.orders(gateway_transaction_id) where gateway_transaction_id is not null;
 alter table public.orders add column if not exists tracking_token_hash text;
 create index if not exists orders_user_created_idx on public.orders(user_id, created_at desc);
 create index if not exists orders_created_at_idx on public.orders(created_at desc);
@@ -283,9 +299,9 @@ begin
   );
   tracking_token_value := pg_catalog.encode(extensions.gen_random_bytes(32), 'hex');
 
-  insert into public.orders (user_id, customer_name, customer_phone, customer_address, region, payload, tracking_token_hash)
+  insert into public.orders (user_id, customer_name, customer_phone, customer_address, region, payload, tracking_token_hash, products_total, shipping_fee, payment_method, payment_status, currency)
   values (auth.uid(), pg_catalog.btrim(p_customer_name), pg_catalog.btrim(p_customer_phone), pg_catalog.btrim(p_customer_address), p_region, trusted_payload,
-    pg_catalog.encode(extensions.digest(tracking_token_value, 'sha256'), 'hex'))
+    pg_catalog.encode(extensions.digest(tracking_token_value, 'sha256'), 'hex'), trusted_subtotal, trusted_delivery_fee, 'CASH_ON_DELIVERY', 'UNPAID_AT_DELIVERY', 'ILS')
   returning id into created_order_number;
   if wheel_coupon_spin_id is not null then
     update public.wheel_spins set redeemed_order_id = created_order_number, redeemed_at = pg_catalog.now()

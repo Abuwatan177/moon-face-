@@ -4,6 +4,7 @@ import webpush from 'web-push';
 import { createClient } from '@supabase/supabase-js';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { createPaymentSession, processPaymentWebhook, verifyPaymentForOrder, PaymentGatewayError } from './services/PaymentGatewayService.js';
 
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const { SUPABASE_SERVICE_ROLE_KEY, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, ONESIGNAL_APP_ID, ONESIGNAL_REST_API_KEY } = process.env;
@@ -115,7 +116,12 @@ app.use((request, response, next) => {
   if (request.method === 'OPTIONS') return response.sendStatus(204);
   next();
 });
-app.use(express.json({ limit: '24kb' }));
+app.use(express.json({
+  limit: '24kb',
+  verify: (request, _response, buffer) => {
+    request.rawBody = Buffer.from(buffer);
+  },
+}));
 
 function sessionIdFrom(request) {
   const sessionId = request.get('x-cart-session');
@@ -295,6 +301,41 @@ app.get(['/share/product/:id', '/api/share/product/:id'], async (request, respon
 app.get('/api/push/public-key', (_request, response) => {
   if (!vapidConfigured) return response.status(503).json({ error: 'Push notifications are not configured.' });
   response.json({ publicKey: VAPID_PUBLIC_KEY });
+});
+
+app.post('/api/payment/create-session', async (request, response) => {
+  try {
+    const session = await createPaymentSession(request.body);
+    response.setHeader('Cache-Control', 'no-store');
+    response.json(session);
+  } catch (error) {
+    if (error instanceof PaymentGatewayError) return response.status(error.status).json({ error: error.message });
+    logLimitedError('payment-create-session', 'Payment session creation failed:', error?.name || 'Unknown error');
+    response.status(503).json({ error: 'تعذر بدء الدفع بالبطاقة. يرجى اختيار الدفع عند الاستلام.' });
+  }
+});
+
+app.post('/api/payment/webhook', async (request, response) => {
+  try {
+    const result = await processPaymentWebhook({ body: request.body, rawBody: request.rawBody, headers: request.headers });
+    response.json(result);
+  } catch (error) {
+    if (error instanceof PaymentGatewayError) return response.status(error.status).json({ error: error.message });
+    logLimitedError('payment-webhook', 'Payment webhook processing failed:', error?.name || 'Unknown error');
+    response.status(503).json({ error: 'تعذر التحقق من إشعار الدفع.' });
+  }
+});
+
+app.get('/api/payment/verify/:orderId', async (request, response) => {
+  try {
+    const result = await verifyPaymentForOrder(request.params.orderId);
+    response.setHeader('Cache-Control', 'no-store');
+    response.json(result);
+  } catch (error) {
+    if (error instanceof PaymentGatewayError) return response.status(error.status).json({ error: error.message });
+    logLimitedError('payment-verify', 'Payment verification failed:', error?.name || 'Unknown error');
+    response.status(503).json({ error: 'تعذر التحقق من حالة الدفع الآن.' });
+  }
 });
 
 app.post('/api/upload-r2', async (request, response) => {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Bell, Check, LoaderCircle, MessageCircle, Minus, Plus, ShoppingBag, Trash2, X } from 'lucide-react';
+import { Bell, Check, CreditCard, LoaderCircle, MessageCircle, Minus, Plus, ShoppingBag, Trash2, X } from 'lucide-react';
 import AnimatedActionButton from './AnimatedActionButton';
 import StoredMedia from './StoredMedia';
 import type { Product } from '../data/products';
@@ -16,6 +16,7 @@ export default function CartDrawer({ open, items, sessionId, whatsappNumber, onC
   const { language, t } = useLanguage();
   const { user } = useAuth();
   const [region, setRegion] = useState<'الضفة' | 'القدس' | 'الداخل'>('الضفة');
+  const [paymentMethod, setPaymentMethod] = useState<'CASH_ON_DELIVERY' | 'CARD'>('CASH_ON_DELIVERY');
   const [customer, setCustomer] = useState({ name: '', phone: '', address: '' });
   const [orderNotice, setOrderNotice] = useState<{ number: string; token: string } | null>(null);
   const [whatsappHref, setWhatsappHref] = useState('');
@@ -92,6 +93,7 @@ export default function CartDrawer({ open, items, sessionId, whatsappNumber, onC
   };
 
   const confirmOrder = async () => {
+    if (paymentMethod !== 'CASH_ON_DELIVERY') return false;
     if (!customer.name || !customer.phone || !customer.address || !items.length) return false;
     const whatsappDigits = whatsappNumber.replace(/\D/g, '');
     const whatsappWindow = whatsappDigits ? window.open('about:blank', '_blank') : null;
@@ -170,11 +172,37 @@ export default function CartDrawer({ open, items, sessionId, whatsappNumber, onC
         <div className="mt-4 border-y border-moon-face-200 py-3"><motion.button type="button" onClick={() => void enableCartReminders()} disabled={pushBusy || pushEnabled || !pushStatusLoaded} aria-live="polite" whileTap={!pushBusy && !pushEnabled && pushStatusLoaded ? { scale: 0.98 } : undefined} className={`flex w-full items-center justify-center gap-2 py-2 text-sm font-semibold transition-colors disabled:cursor-default ${pushEnabled ? 'text-emerald-700' : 'text-[#563C2E]'}`}><AnimatePresence mode="wait" initial={false}>{pushBusy || !pushStatusLoaded ? <motion.span key="busy" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} className="inline-flex items-center gap-2"><LoaderCircle size={16} className="animate-spin" />{t('loading')}</motion.span> : pushEnabled ? <motion.span key="enabled" initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ type: 'spring', stiffness: 420, damping: 22 }} className="inline-flex items-center gap-2"><Check size={17} strokeWidth={3} />{t('notificationEnabled')}</motion.span> : <motion.span key="idle" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} className="inline-flex items-center gap-2"><Bell size={16} />{t('cartReminderOptIn')}</motion.span>}</AnimatePresence></motion.button>{pushNotice && !pushEnabled && <p role="status" className="text-center text-xs text-red-700">{pushNotice}</p>}</div>
         <div className="mt-8"><p className="text-xs font-light text-charcoal-500 mb-3">{t('delivery')}</p><div className="grid grid-cols-3 gap-2">{Object.entries(delivery).map(([name, price]) => <button key={name} onClick={() => setRegion(name as keyof typeof delivery)} className={`rounded-lg border py-3 text-sm transition-all ${region === name ? 'border-moon-face-600 bg-moon-face-100 shadow-md' : 'border-charcoal-200 bg-white'}`}><span className="block">{({ الضفة: t('westBank'), القدس: t('jerusalem'), الداخل: t('inside') }[name as keyof typeof delivery])}</span><b>₪{price}</b></button>)}</div>
           <div className="space-y-3 mt-5"><input value={customer.name} onChange={(event) => setCustomer({ ...customer, name: event.target.value })} placeholder={t('name')} className="field" /><input value={customer.phone} onChange={(event) => setCustomer({ ...customer, phone: event.target.value })} placeholder={t('phone')} type="tel" className="field" /><textarea value={customer.address} onChange={(event) => setCustomer({ ...customer, address: event.target.value })} placeholder={t('address')} className="field min-h-20 resize-none" /></div>
+            <fieldset className="mt-5 space-y-2">
+              <legend className="mb-2 text-sm font-bold">{language === 'en' ? 'Payment method' : 'طريقة الدفع'}</legend>
+              <label className={`flex cursor-pointer items-center gap-3 rounded-lg border bg-white p-3 ${paymentMethod === 'CASH_ON_DELIVERY' ? 'border-moon-face-600 ring-1 ring-moon-face-600' : 'border-charcoal-200'}`}>
+                <input type="radio" name="payment-method" value="CASH_ON_DELIVERY" checked={paymentMethod === 'CASH_ON_DELIVERY'} onChange={() => setPaymentMethod('CASH_ON_DELIVERY')} />
+                <span className="text-sm font-semibold">{language === 'en' ? 'Cash on delivery' : 'الدفع عند الاستلام'}</span>
+              </label>
+              <label className={`flex cursor-pointer items-center gap-3 rounded-lg border bg-white p-3 ${paymentMethod === 'CARD' ? 'border-moon-face-600 ring-1 ring-moon-face-600' : 'border-charcoal-200'}`}>
+                <input type="radio" name="payment-method" value="CARD" checked={paymentMethod === 'CARD'} onChange={() => setPaymentMethod('CARD')} />
+                <CreditCard size={18} aria-hidden="true" />
+                <span className="text-sm font-semibold">{language === 'en' ? 'Credit / debit card' : 'الدفع عبر البطاقة'}</span>
+              </label>
+              <AnimatePresence initial={false}>
+                {paymentMethod === 'CARD' && <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                  <div role="status" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+                    {language === 'en'
+                      ? 'Card payments are not enabled yet. No card details are collected here. Please choose cash on delivery.'
+                      : 'الدفع بالبطاقة غير متاح حاليًا. لا تُدخل بيانات البطاقة هنا. يرجى اختيار الدفع عند الاستلام.'}
+                    <p className="mt-2 text-xs">
+                      {language === 'en'
+                        ? 'When enabled, the bank-hosted fields will charge the products amount in ILS only; delivery is paid in cash on receipt.'
+                        : 'عند تفعيل الخدمة، ستُخصم قيمة المنتجات فقط (بالشيكل) عبر البطاقة، وتُدفع رسوم التوصيل نقدًا عند الاستلام.'}
+                    </p>
+                  </div>
+                </motion.div>}
+              </AnimatePresence>
+            </fieldset>
           {user && maxRedeemablePoints > 0 && <label className="mt-4 block text-sm">{t('redeemPoints')} · {loyaltyBalance}<input className="field mt-1" type="number" min="0" max={maxRedeemablePoints} step="1" value={pointsToRedeem || ''} onChange={(event) => setPointsToRedeem(Number(event.target.value) || 0)} /><span className="mt-1 block text-xs text-charcoal-500">{t('pointsWorth')}: ₪{loyaltyDiscount.toFixed(2)}</span></label>}
           <div className="mt-5 flex gap-2"><input value={couponInput} onChange={(event) => { setCouponInput(event.target.value); setCouponApplied(false); setCouponDiscountPercent(0); setCouponMessage(''); }} placeholder={t('couponPlaceholder')} className="field min-w-0" /><button type="button" onClick={() => void applyCoupon()} className="shrink-0 rounded-lg border border-moon-face-600 px-4 text-sm font-bold text-moon-face-800 hover:bg-moon-face-100">{t('applyCoupon')}</button></div>
           {couponMessage && <p className={`mt-2 text-sm ${couponApplied ? 'text-green-700' : 'text-red-600'}`} role="status">{couponMessage}</p>}
           <div className="mt-5 space-y-2 border-t pt-4 text-sm"><div className="flex justify-between"><span>{t('subtotal')}</span><span>₪{subtotal}</span></div>{couponApplied && <div className="flex justify-between text-green-700"><span>{t('couponDiscount')}</span><span>-₪{discount}</span></div>}{redeemedPoints > 0 && <div className="flex justify-between text-green-700"><span>{t('redeemPoints')} ({redeemedPoints})</span><span>-₪{loyaltyDiscount.toFixed(2)}</span></div>}<div className="flex justify-between text-charcoal-500"><span>{t('deliveryFee')}</span><span>₪{delivery[region]}</span></div><div className="flex justify-between border-t pt-3 text-lg font-bold"><span>{t('total')}</span><span>₪{total.toFixed(2)}</span></div></div>
-          <AnimatedActionButton disabled={!customer.name || !customer.phone || !customer.address} onAction={confirmOrder} onSuccess={(result) => { if (typeof result === 'string') { const [number, token] = result.split(':'); if (number && token) setOrderNotice({ number, token }); } setPointsToRedeem(0); onClear(); }} icon={<ShoppingBag size={18} />} className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-[#3B2A22] py-4 font-bold text-white transition-all hover:bg-moon-face-800 disabled:opacity-40">{t('confirm')}</AnimatedActionButton>
+          <AnimatedActionButton disabled={paymentMethod !== 'CASH_ON_DELIVERY' || !customer.name || !customer.phone || !customer.address} onAction={confirmOrder} onSuccess={(result) => { if (typeof result === 'string') { const [number, token] = result.split(':'); if (number && token) setOrderNotice({ number, token }); } setPointsToRedeem(0); onClear(); }} icon={<ShoppingBag size={18} />} className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-[#3B2A22] py-4 font-bold text-white transition-all hover:bg-moon-face-800 disabled:opacity-40">{t('confirm')}</AnimatedActionButton>
         </div>
       </>}
     </motion.aside>
