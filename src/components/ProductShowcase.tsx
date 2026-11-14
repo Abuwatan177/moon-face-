@@ -83,7 +83,7 @@ export function ProductCard({ product, index, onAdd, liked, onToggleWishlist, se
   const canAddToCart = productAvailable;
 
   return (
-    <motion.div ref={cardRef} dir={language === 'en' ? 'ltr' : 'rtl'} layout initial={{ opacity: 0, y: 22 }} animate={cardInView || !animateOnView ? { opacity: 1, y: 0 } : { opacity: 0, y: 22 }} transition={{ duration: 0.36, delay: Math.min(index * 0.035, 0.18) }} className={`group h-full scroll-mt-32 rounded-2xl ${isOffer ? 'bg-transparent p-1 text-white shadow-none' : 'bg-white p-2.5 text-[#292c23] shadow-sm hover:shadow-lg max-[520px]:rounded-xl max-[520px]:p-1.5'} transition-shadow ${selected ? 'ring-2 ring-moon-face-400 shadow-lg shadow-moon-face-200/40' : ''}`}>
+    <motion.div ref={cardRef} dir={language === 'en' ? 'ltr' : 'rtl'} layout initial={{ opacity: 0, y: 22 }} animate={cardInView || !animateOnView ? { opacity: 1, y: 0 } : { opacity: 0, y: 22 }} transition={{ duration: 0.36, delay: Math.min(index * 0.035, 0.18) }} className={`group min-w-0 h-full scroll-mt-32 rounded-2xl ${isOffer ? 'bg-transparent p-1 text-white shadow-none' : 'bg-white p-2.5 text-[#292c23] shadow-sm hover:shadow-lg max-[520px]:rounded-xl max-[520px]:p-1.5'} transition-shadow ${selected ? 'ring-2 ring-moon-face-400 shadow-lg shadow-moon-face-200/40' : ''}`}>
       <div role="button" tabIndex={0} onClick={() => onSelect(product.id)} onKeyDown={(event) => event.key === 'Enter' && onSelect(product.id)} aria-label={`${t('detailsLabel')}: ${language === 'ar' ? product.nameAr : product.name}`} className="relative mb-3 aspect-[3/4] cursor-pointer overflow-hidden rounded-xl bg-moon-face-100 max-[520px]:mb-2 max-[520px]:rounded-lg">
         <MediaCarousel key={`${product.id}:${activeColor?.name || ''}`} items={cardMedia} alt={`${language === 'ar' ? product.nameAr : product.name} - ${activeColor?.name || ''}`} className="absolute inset-0 h-full w-full bg-[#eeecdf]" fit="cover" />
         <span className={`absolute top-3 left-3 max-w-[calc(100%-2.5rem)] truncate rounded-full px-3 py-1 text-sm font-bold max-[520px]:top-2 max-[520px]:left-2 max-[520px]:px-2 max-[520px]:py-1 max-[520px]:text-xs ${isOffer ? 'bg-[#9a5539] text-white' : 'bg-white/90 text-[#292c23]'}`}>{product.originalPrice > product.price && !product.badge ? t('salesLabel') : translateProductBadge(product.badge || '', language)}</span>
@@ -121,7 +121,7 @@ export function ProductCard({ product, index, onAdd, liked, onToggleWishlist, se
           </AnimatedActionButton>
         </div>
 
-        <div className="mt-3 flex gap-1.5 max-[520px]:mt-2 max-[520px]:gap-1">
+        <div className="mt-3 flex w-full min-w-0 flex-wrap items-center gap-x-1.5 gap-y-2 max-[520px]:mt-2 max-[520px]:gap-x-1 max-[520px]:gap-y-1.5">
           {colors.map((item) => {
             const hasAnySizeAvailable = item.available;
             const selected = selectedColor === item.name; 
@@ -130,7 +130,7 @@ export function ProductCard({ product, index, onAdd, liked, onToggleWishlist, se
               <button 
                 key={item.name} 
                 onClick={() => setSelectedColor(item.name)}
-                className={`relative rounded-full transition-transform hover:scale-110 ${isOffer ? 'h-4 w-4' : 'h-6 w-6'} ${selected ? `${isOffer ? 'ring-1 ring-offset-1' : 'ring-2 ring-offset-2'} ring-[#c59b52] scale-110` : 'border border-gray-200'} ${!hasAnySizeAvailable ? 'opacity-60 grayscale' : ''}`} 
+                className={`relative shrink-0 rounded-full transition-transform hover:scale-110 ${isOffer ? 'h-4 w-4' : 'h-6 w-6'} ${selected ? `${isOffer ? 'ring-1 ring-offset-1' : 'ring-2 ring-offset-2'} ring-[#c59b52] scale-110` : 'border border-gray-200'} ${!hasAnySizeAvailable ? 'opacity-60 grayscale' : ''}`}
                 style={getProductColorStyle(item.name, item.customColor)}
                 aria-label={`${t('color')} ${translateProductColor(item.name, language)}`}
                 title={translateProductColor(item.name, language)}
