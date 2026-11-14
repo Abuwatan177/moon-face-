@@ -1149,6 +1149,21 @@ export async function saveUploadedMedia(blob: Blob, _filename: string, tryLossle
     if (sessionError) throw sessionError;
     if (!session?.access_token) throw new Error('يجب تسجيل الدخول كمالك للمتجر لرفع الملفات.');
 
+    if (blob.type === 'image/webp') {
+      const response = await fetch(`${backendUrl}/api/upload-r2-image`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'image/webp',
+        },
+        body: blob,
+      });
+      const result = await response.json().catch(() => ({})) as { publicUrl?: string; error?: string };
+      if (!response.ok) throw new Error(result.error || `تعذر رفع الصورة (HTTP ${response.status}).`);
+      if (!result.publicUrl) throw new Error('استجابة رفع الصورة غير مكتملة.');
+      return result.publicUrl;
+    }
+
     const response = await fetch(`${backendUrl}/api/upload-r2`, {
       method: 'POST',
       headers: {

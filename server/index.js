@@ -384,6 +384,46 @@ app.post('/api/upload-r2', async (request, response) => {
   }
 });
 
+app.post('/api/upload-r2-image', express.raw({ type: 'image/webp', limit: '10mb' }), async (request, response) => {
+  if (!r2Configured || !r2Client) {
+    return response.status(503).json({ error: 'Cloudflare R2 uploads are not configured on the server.' });
+  }
+  if (!supabase) {
+    return response.status(503).json({ error: 'Supabase authentication is not configured on the server.' });
+  }
+  if (!Buffer.isBuffer(request.body) || request.body.length < 1) {
+    return response.status(400).json({ error: 'لم تصل بيانات الصورة. أعد اختيار الصورة وحاول مرة أخرى.' });
+  }
+
+  try {
+    await requireStoreOwner(request);
+  } catch (error) {
+    const status = Number(error?.status);
+    if (status === 401 || status === 403) {
+      return response.status(status).json({ error: 'يجب تسجيل الدخول بحساب مدير المتجر قبل رفع الصور.' });
+    }
+    logLimitedError('r2-image-upload-auth', 'Could not verify R2 image upload authorization:', error?.name || 'Unknown error');
+    return response.status(503).json({ error: 'تعذر التحقق من صلاحية رفع الصور. أعد تحميل الصفحة وحاول مرة أخرى.' });
+  }
+
+  try {
+    const key = `${randomUUID()}.webp`;
+    await r2Client.send(new PutObjectCommand({
+      Bucket: r2BucketName,
+      Key: key,
+      Body: request.body,
+      ContentLength: request.body.length,
+      ContentType: 'image/webp',
+      CacheControl: r2UploadCacheControl,
+    }));
+    response.setHeader('Cache-Control', 'no-store');
+    response.json({ publicUrl: `${r2PublicUrl}/${key}` });
+  } catch (error) {
+    logLimitedError('r2-image-upload', 'Could not upload an image to R2:', error?.name || 'Unknown error');
+    response.status(502).json({ error: 'تعذر حفظ الصورة في التخزين. تحقق من اتصال الإنترنت وحاول مجدداً.' });
+  }
+});
+
 app.post('/api/cart-sessions', async (request, response, next) => {
   try {
     const identity = await getIdentity(request);

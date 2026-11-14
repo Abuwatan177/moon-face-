@@ -6,7 +6,7 @@ import type { SiteContent } from '../data/siteContent';
 import { getProductColorHex } from '../utils/productColors';
 import { getFinalProductImageUrl, getFinalProductImageUrls, getProductImageUrl, getProductImageUrls } from '../utils/productImages';
 import { toWebpStorageUrl } from '../utils/media';
-import { smartCompressToWebP } from '../utils/optimizeImage';
+import { isImageFile, smartCompressToWebP } from '../utils/optimizeImage';
 import { useAuth } from '../context/AuthContext';
 import { loadArchivedProducts as loadArchivedProductsFromApi, loadLoyaltyConfig, loadWheelConfig, permanentlyDeleteArchivedProduct, saveLoyaltyConfig, saveWheelConfig, saveUploadedMedia, sendAdminBroadcastNotification, type LoyaltyCampaign, type LoyaltyConfig, type WheelConfig, type WheelSlice } from '../lib/api';
 import StoredMedia, { LazyImage } from './StoredMedia';
@@ -155,17 +155,19 @@ export default function AdminPanel({ products, onSave, siteContent, onSaveSiteCo
     setProductImagesUploading((current) => current + 1);
     try {
       onRead(await uploadOptimizedImage(file));
-    } catch {
-      setSaveError('تعذر رفع الصورة. تحقق من الاتصال وصلاحيات تخزين الصور.');
+    } catch (error) {
+      setSaveError(error instanceof Error ? `تعذر رفع الصورة: ${error.message}` : 'تعذر رفع الصورة. تحقق من الاتصال والتخزين ثم أعد المحاولة.');
     } finally {
       setProductImagesUploading((current) => Math.max(0, current - 1));
     }
   };
 
   const readMediaFiles = (files: FileList | null, onRead: (media: NonNullable<Product['media']>) => void) => {
-    const images = Array.from(files || []).filter((file) => file.type.startsWith('image/'));
+    const images = Array.from(files || []).filter(isImageFile);
     if (!images.length) return;
-    void uploadOptimizedImages(images).then((urls) => onRead(urls.map((url) => ({ type: 'image' as const, url })))).catch(() => setSaveError('تعذر حفظ الصور في التخزين المحلي.'));
+    void uploadProductImages(images)
+      .then((urls) => onRead(urls.map((url) => ({ type: 'image' as const, url }))))
+      .catch((error) => setSaveError(error instanceof Error ? `تعذر رفع الصور: ${error.message}` : 'تعذر رفع الصور. تحقق من الاتصال والتخزين ثم أعد المحاولة.'));
   };
 
 const save = async (productsToSave?: Product[]) => {
@@ -677,9 +679,9 @@ function ColorMediaEditor({ color, onChange, uploadImages, onError }: { color: P
       updateMedia((media) => media.map((item) => item.type === 'image' && uploadedByPreview.has(item.url)
         ? { ...item, url: uploadedByPreview.get(item.url)! }
         : item));
-    } catch {
+    } catch (error) {
       updateMedia((media) => media.filter((item) => !previews.includes(item.url)));
-      onError('تعذر رفع صورة أو أكثر لهذا اللون. تحقق من الاتصال وصلاحيات التخزين ثم أعد المحاولة.');
+      onError(error instanceof Error ? `تعذر رفع صور هذا اللون: ${error.message}` : 'تعذر رفع صور هذا اللون. تحقق من الاتصال والتخزين ثم أعد المحاولة.');
     } finally {
       previews.forEach((preview) => URL.revokeObjectURL(preview));
       setUploadingUrls((current) => current.filter((url) => !previews.includes(url)));
@@ -693,7 +695,7 @@ function ColorMediaEditor({ color, onChange, uploadImages, onError }: { color: P
       {color.customColor && <button type="button" onClick={() => onChange((currentColor) => ({ ...currentColor, customColor: undefined }))} className="grid size-8 place-items-center rounded-md text-charcoal-500 hover:bg-moon-face-100" aria-label={`استعادة اللون التلقائي ${color.name}`} title="استعادة اللون التلقائي"><RotateCcw size={15} /></button>}
     </label>
     <label className="flex cursor-pointer items-center gap-2 text-xs text-charcoal-500"><ImagePlus size={16} /> إضافة صور لهذا اللون
-      <input type="file" accept="image/*" multiple className="hidden" onChange={(event) => { const files = Array.from(event.currentTarget.files || []).filter((file) => file.type.startsWith('image/')); event.currentTarget.value = ''; if (files.length) void addImages(files); }} />
+      <input type="file" accept="image/*" multiple className="hidden" onChange={(event) => { const files = Array.from(event.currentTarget.files || []).filter(isImageFile); event.currentTarget.value = ''; if (files.length) void addImages(files); }} />
     </label>
     <div className="flex gap-2">
       <input type="url" dir="ltr" className="field min-w-0" value={videoUrl} onChange={(event) => setVideoUrl(event.target.value)} placeholder="رابط فيديو هذا اللون" aria-label={`رابط فيديو ${color.name || 'اللون'}`} />
@@ -711,7 +713,9 @@ function ColorMediaEditor({ color, onChange, uploadImages, onError }: { color: P
 
 function readImage(file: File | undefined, onRead: (image: string) => void, onError: (message: string) => void) {
   if (!file) return;
-  void uploadOptimizedImage(file).then(onRead).catch(() => onError('تعذر رفع الصورة. تحقق من الاتصال وصلاحيات تخزين الصور.'));
+  void uploadOptimizedImage(file)
+    .then(onRead)
+    .catch((error) => onError(error instanceof Error ? `تعذر رفع الصورة: ${error.message}` : 'تعذر رفع الصورة. تحقق من الاتصال والتخزين ثم أعد المحاولة.'));
 }
 
 async function uploadOptimizedImage(file: File) {
@@ -719,7 +723,9 @@ async function uploadOptimizedImage(file: File) {
 }
 
 async function uploadOptimizedImages(files: File[]) {
-  return Promise.all(files.map((file) => uploadOptimizedImage(file)));
+  const uploaded: string[] = [];
+  for (const file of files) uploaded.push(await uploadOptimizedImage(file));
+  return uploaded;
 }
 
 function ContentTab({ draft, products, update, onSave, readMediaFiles, onError, saving, saved }: { draft: SiteContent; products: Product[]; update: (content: SiteContent) => void; onSave: () => void; readMediaFiles: (files: FileList | null, onRead: (media: NonNullable<Product['media']>) => void) => void; onError: (message: string) => void; saving: boolean; saved: boolean }) {
