@@ -6,7 +6,7 @@ import type { SiteContent } from '../data/siteContent';
 import { getProductColorHex } from '../utils/productColors';
 import { getFinalProductImageUrl, getFinalProductImageUrls, getProductImageUrl, getProductImageUrls } from '../utils/productImages';
 import { toWebpStorageUrl } from '../utils/media';
-import { isImageFile, smartCompressToWebP } from '../utils/optimizeImage';
+import { isImageFile, optimizeImageForUpload } from '../utils/optimizeImage';
 import { useAuth } from '../context/AuthContext';
 import { loadArchivedProducts as loadArchivedProductsFromApi, loadLoyaltyConfig, loadWheelConfig, permanentlyDeleteArchivedProduct, saveLoyaltyConfig, saveWheelConfig, saveUploadedMedia, sendAdminBroadcastNotification, type LoyaltyCampaign, type LoyaltyConfig, type WheelConfig, type WheelSlice } from '../lib/api';
 import StoredMedia, { LazyImage } from './StoredMedia';
@@ -719,7 +719,7 @@ function readImage(file: File | undefined, onRead: (image: string) => void, onEr
 }
 
 async function uploadOptimizedImage(file: File) {
-  return saveUploadedMedia(await smartCompressToWebP(file), file.name);
+  return saveUploadedMedia(await optimizeImageForUpload(file), file.name);
 }
 
 async function uploadOptimizedImages(files: File[]) {

@@ -1141,20 +1141,21 @@ export async function deleteProductComment(id: string) {
 
 export async function saveUploadedMedia(blob: Blob, _filename: string, tryLosslessCompression = false) {
   if (blob.size > 100 * 1024 * 1024) throw new Error('حجم الملف يتجاوز 100MB. اختر ملفاً أصغر.');
-  if (blob.type.startsWith('image/') && blob.type !== 'image/webp') {
-    throw new Error('يجب تحويل الصورة إلى WebP قبل حفظها.');
+  const imageTypes = new Set(['image/webp', 'image/png', 'image/jpeg']);
+  if (blob.type.startsWith('image/') && !imageTypes.has(blob.type)) {
+    throw new Error('صيغة الصورة غير مدعومة. اختر صورة بصيغة JPG أو PNG.');
   }
   if (supabase) {
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     if (sessionError) throw sessionError;
     if (!session?.access_token) throw new Error('يجب تسجيل الدخول كمالك للمتجر لرفع الملفات.');
 
-    if (blob.type === 'image/webp') {
+    if (imageTypes.has(blob.type)) {
       const response = await fetch(`${backendUrl}/api/upload-r2-image`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${session.access_token}`,
-          'Content-Type': 'image/webp',
+          'Content-Type': blob.type,
         },
         body: blob,
       });

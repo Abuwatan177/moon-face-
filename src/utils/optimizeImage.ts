@@ -56,7 +56,7 @@ async function loadImage(file: File) {
   }
 }
 
-export async function smartCompressToWebP(file: File): Promise<Blob> {
+export async function optimizeImageForUpload(file: File): Promise<Blob> {
   if (!isImageFile(file)) throw new Error('الملف المحدد ليس صورة.');
   const image = await loadImage(file);
   try {
@@ -72,15 +72,22 @@ export async function smartCompressToWebP(file: File): Promise<Blob> {
       canvas.toBlob(resolve, 'image/webp', quality);
     });
     const firstPass = await encode(FIRST_QUALITY);
-    if (!firstPass || firstPass.type !== 'image/webp') throw new Error('تعذر تحويل الصورة إلى WebP على هذا الجهاز.');
-    if (firstPass.size <= MAX_OUTPUT_BYTES) return firstPass;
+    if (firstPass?.type === 'image/webp' && firstPass.size <= MAX_OUTPUT_BYTES) return firstPass;
 
-    const secondPass = await encode(RETRY_QUALITY);
-    if (!secondPass || secondPass.type !== 'image/webp') throw new Error('تعذر ضغط الصورة على هذا الجهاز.');
-    return secondPass;
+    if (firstPass?.type === 'image/webp') {
+      const secondPass = await encode(RETRY_QUALITY);
+      if (secondPass?.type === 'image/webp') return secondPass;
+    }
+
+    const fallback = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, 'image/png');
+    });
+    if (!fallback || fallback.type !== 'image/png') throw new Error('تعذر تجهيز الصورة على هذا الجهاز.');
+    return fallback;
   } finally {
     image.close();
   }
 }
 
-export const optimizeImage = smartCompressToWebP;
+export const smartCompressToWebP = optimizeImageForUpload;
+export const optimizeImage = optimizeImageForUpload;

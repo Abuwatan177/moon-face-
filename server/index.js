@@ -4,6 +4,7 @@ import webpush from 'web-push';
 import { createClient } from '@supabase/supabase-js';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import sharp from 'sharp';
 import { createPaymentSession, processPaymentWebhook, verifyPaymentForOrder, PaymentGatewayError } from './services/PaymentGatewayService.js';
 
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
@@ -53,6 +54,7 @@ const r2UploadTypes = new Map([
   ['video/3gpp', '3gp'],
   ['video/3gpp2', '3g2'],
 ]);
+const r2ImageTypes = new Set(['image/webp', 'image/png', 'image/jpeg']);
 const r2UploadCacheControl = 'public, max-age=31536000, immutable';
 const app = express();
 const port = Number(process.env.API_PORT || 3001);
@@ -384,17 +386,13 @@ app.post('/api/upload-r2', async (request, response) => {
   }
 });
 
-app.post('/api/upload-r2-image', express.raw({ type: 'image/webp', limit: '10mb' }), async (request, response) => {
+app.post('/api/upload-r2-image', express.raw({ type: [...r2ImageTypes], limit: '10mb' }), async (request, response) => {
   if (!r2Configured || !r2Client) {
     return response.status(503).json({ error: 'Cloudflare R2 uploads are not configured on the server.' });
   }
   if (!supabase) {
     return response.status(503).json({ error: 'Supabase authentication is not configured on the server.' });
   }
-  if (!Buffer.isBuffer(request.body) || request.body.length < 1) {
-    return response.status(400).json({ error: 'لم تصل بيانات الصورة. أعد اختيار الصورة وحاول مرة أخرى.' });
-  }
-
   try {
     await requireStoreOwner(request);
   } catch (error) {
@@ -406,13 +404,30 @@ app.post('/api/upload-r2-image', express.raw({ type: 'image/webp', limit: '10mb'
     return response.status(503).json({ error: 'تعذر التحقق من صلاحية رفع الصور. أعد تحميل الصفحة وحاول مرة أخرى.' });
   }
 
+  const contentType = request.get('content-type')?.split(';', 1)[0].trim().toLowerCase();
+  if (!r2ImageTypes.has(contentType) || !Buffer.isBuffer(request.body) || request.body.length < 1) {
+    return response.status(400).json({ error: 'لم تصل بيانات صورة صالحة. اختر صورة بصيغة JPG أو PNG وحاول مرة أخرى.' });
+  }
+
+  let optimizedImage;
+  try {
+    optimizedImage = await sharp(request.body, { limitInputPixels: 40_000_000 })
+      .rotate()
+      .resize({ width: 1000, height: 1000, fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: 78, effort: 4 })
+      .toBuffer();
+  } catch (error) {
+    logLimitedError('r2-image-processing', 'Could not convert an uploaded image:', error?.name || 'Unknown error');
+    return response.status(400).json({ error: 'تعذر قراءة الصورة. جرّب حفظها بصيغة JPG أو PNG ثم أعد رفعها.' });
+  }
+
   try {
     const key = `${randomUUID()}.webp`;
     await r2Client.send(new PutObjectCommand({
       Bucket: r2BucketName,
       Key: key,
-      Body: request.body,
-      ContentLength: request.body.length,
+      Body: optimizedImage,
+      ContentLength: optimizedImage.length,
       ContentType: 'image/webp',
       CacheControl: r2UploadCacheControl,
     }));
