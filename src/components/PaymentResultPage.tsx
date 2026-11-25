@@ -16,18 +16,14 @@ export default function PaymentResultPage() {
       setState('cancelled');
       return;
     }
-    if (params.get('status') !== 'success' && !params.has('signature')) {
-      setState('failed');
-      return;
-    }
-    const orderId = params.get('order-ext-ref');
-    if (!orderId) {
+    const reference = params.get('reference');
+    if (!reference) {
       setState('failed');
       return;
     }
 
     let active = true;
-    void verifyCardPayment(orderId, params.toString())
+    void verifyCardPayment(reference)
       .then((result) => {
         if (!active) return;
         setCurrency(result.currency);
@@ -40,16 +36,16 @@ export default function PaymentResultPage() {
 
   const copy = language === 'en'
     ? {
-      checking: 'Verifying your payment', checkingText: 'We are confirming the signed transaction with 2Checkout.',
+      checking: 'Verifying your payment', checkingText: 'We are confirming your transaction securely with Lahza.',
       paid: 'Payment confirmed', paidText: `Your payment was verified successfully in ${currency}.`,
-      cancelled: 'Payment cancelled', cancelledText: 'No successful payment was confirmed. You can return to the store and try again.',
-      failed: 'Payment not verified', failedText: 'We could not verify this payment. Please contact Moon Face before placing another order.', back: 'Return to store',
+      cancelled: 'Payment cancelled', cancelledText: 'No successful payment was confirmed. Your cart is still available if you want to try again.',
+      failed: 'Payment not verified', failedText: 'We could not verify this payment. Your cart is still available so you can return and try again.', back: 'Return to store and try again',
     }
     : {
-      checking: 'جارٍ التحقق من الدفع', checkingText: 'نتحقق من توقيع العملية مع 2Checkout.',
-      paid: 'تم تأكيد الدفع', paidText: `تم التحقق من دفعتك بنجاح بعملة ${currency}.`,
-      cancelled: 'تم إلغاء الدفع', cancelledText: 'لم نتلق تأكيدًا بعملية دفع ناجحة. يمكنك العودة إلى المتجر والمحاولة مجددًا.',
-      failed: 'تعذر التحقق من الدفع', failedText: 'لم نتمكن من التحقق من هذه الدفعة. يرجى التواصل مع Moon Face قبل إنشاء طلب آخر.', back: 'العودة إلى المتجر',
+      checking: 'جارٍ التحقق من الدفع', checkingText: 'نتحقق بأمان من عملية الدفع لدى Lahza.',
+      paid: 'تم الدفع بنجاح وتأكيد طلبك', paidText: `تم التحقق من دفعتك بنجاح بعملة ${currency}.`,
+      cancelled: 'تم إلغاء الدفع', cancelledText: 'لم يتم تأكيد الدفع. ما زالت سلة مشترياتك متاحة إذا رغبت في المحاولة مجددًا.',
+      failed: 'تعذر تأكيد الدفع', failedText: 'لم نتمكن من تأكيد هذه الدفعة. سلة مشترياتك ما زالت متاحة للعودة والمحاولة مجددًا.', back: 'العودة إلى المتجر والمحاولة مجددًا',
     };
   const details = { checking: copy.checkingText, paid: copy.paidText, cancelled: copy.cancelledText, failed: copy.failedText }[state];
   const icon = state === 'checking'

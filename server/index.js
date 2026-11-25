@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import sharp from 'sharp';
-import { createPaymentSession, processPaymentWebhook, verifyPaymentForOrder, PaymentGatewayError } from './services/PaymentGatewayService.js';
+import { createPaymentSession, verifyPayment, PaymentGatewayError } from './services/PaymentGatewayService.js';
 
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const { SUPABASE_SERVICE_ROLE_KEY, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, ONESIGNAL_APP_ID, ONESIGNAL_REST_API_KEY } = process.env;
@@ -311,7 +311,7 @@ app.post('/api/payment/create-session', async (request, response) => {
     if (!Number.isSafeInteger(orderId) || orderId <= 0) return response.status(400).json({ error: 'رقم الطلب غير صالح.' });
     if (!/^[a-f\d]{64}$/i.test(trackingToken)) return response.status(404).json({ error: 'لم يتم العثور على الطلب.' });
     const { data: order, error } = await supabase.from('orders')
-      .select('id,products_total,payload,currency,tracking_token_hash,payment_status')
+      .select('id,products_total,shipping_fee,payload,tracking_token_hash,payment_status,customer_phone')
       .eq('id', orderId)
       .maybeSingle();
     if (error) throw error;
@@ -325,79 +325,73 @@ app.post('/api/payment/create-session', async (request, response) => {
     if (order.payment_status === 'PAID') return response.status(409).json({ error: 'تم دفع هذا الطلب مسبقًا.' });
 
     const payload = order.payload && typeof order.payload === 'object' ? order.payload : {};
-    const amountILS = Number(order.products_total) - Number(payload.discount || 0) - Number(payload.loyaltyDiscount || 0);
-    if (!Number.isFinite(amountILS) || amountILS <= 0) return response.status(400).json({ error: 'قيمة المنتجات غير صالحة للدفع.' });
-    const currency = typeof request.body?.currency === 'string' ? request.body.currency.toUpperCase() : order.currency || 'ILS';
-    let productsAmount = amountILS;
-    if (currency === 'USD') {
-      const ilsToUsdRate = Number(process.env.TWOCHECKOUT_ILS_TO_USD_RATE);
-      if (!Number.isFinite(ilsToUsdRate) || ilsToUsdRate <= 0) {
-        return response.status(503).json({ error: 'لم يتم إعداد سعر التحويل إلى الدولار.' });
-      }
-      productsAmount = Math.round(amountILS * ilsToUsdRate * 100) / 100;
-    } else if (currency !== 'ILS') {
-      return response.status(400).json({ error: 'العملة غير مدعومة.' });
-    }
-
+    const amountILS = Number(order.products_total) - Number(payload.discount || 0)
+      - Number(payload.loyaltyDiscount || 0) + Number(order.shipping_fee);
+    if (!Number.isFinite(amountILS) || amountILS <= 0) return response.status(400).json({ error: 'قيمة الطلب غير صالحة للدفع.' });
+    const { error: pendingError } = await supabase.from('orders').update({
+      payment_method: 'CARD',
+      payment_status: 'PENDING',
+    }).eq('id', orderId);
+    if (pendingError) throw pendingError;
     const session = await createPaymentSession({
       orderId,
-      productsAmount,
-      currency,
+      amountILS,
+      customerEmail: request.body?.customerEmail,
+      customerPhone: order.customer_phone,
     });
+    const { error: updateError } = await supabase.from('orders').update({
+      payment_method: 'CARD',
+      payment_status: 'PENDING',
+      currency: 'ILS',
+      gateway_session_id: session.reference,
+    }).eq('id', orderId);
+    if (updateError) throw updateError;
     response.setHeader('Cache-Control', 'no-store');
     response.json(session);
   } catch (error) {
     if (error instanceof PaymentGatewayError) return response.status(error.status).json({ error: error.message });
     logLimitedError('payment-create-session', 'Payment session creation failed:', error?.name || 'Unknown error');
-    response.status(503).json({ error: 'تعذر بدء الدفع بالبطاقة. يرجى اختيار الدفع عند الاستلام.' });
+    response.status(503).json({ error: 'تعذر بدء الدفع بالبطاقة. يرجى المحاولة مجددًا.' });
   }
 });
 
-app.post('/api/payment/webhook', async (request, response) => {
+app.get('/api/payment/verify', async (request, response) => {
   try {
-    const result = await processPaymentWebhook({ body: request.body, rawBody: request.rawBody, headers: request.headers });
-    response.json(result);
-  } catch (error) {
-    if (error instanceof PaymentGatewayError) return response.status(error.status).json({ error: error.message });
-    logLimitedError('payment-webhook', 'Payment webhook processing failed:', error?.name || 'Unknown error');
-    response.status(503).json({ error: 'تعذر التحقق من إشعار الدفع.' });
-  }
-});
-
-app.get('/api/payment/verify/:orderId', async (request, response) => {
-  try {
-    const orderId = Number(request.params.orderId);
+    const reference = typeof request.query.reference === 'string' ? request.query.reference : '';
+    const payment = await verifyPayment(reference);
+    if (!payment.paid) return response.status(402).json({ error: 'لم يتم تأكيد نجاح الدفع.' });
     const { data: order, error } = await supabase.from('orders')
-      .select('id,products_total,payload,currency,payment_status,gateway_transaction_id')
-      .eq('id', orderId)
+      .select('id,products_total,shipping_fee,payload,payment_status,gateway_transaction_id,gateway_session_id')
+      .eq('gateway_session_id', reference)
       .maybeSingle();
     if (error) throw error;
     if (!order) return response.status(404).json({ error: 'لم يتم العثور على الطلب.' });
 
     const payload = order.payload && typeof order.payload === 'object' ? order.payload : {};
-    const amountILS = Number(order.products_total) - Number(payload.discount || 0) - Number(payload.loyaltyDiscount || 0);
-    const currency = new URLSearchParams(request.originalUrl.split('?')[1] || '').get('total-currency');
-    let expectedAmount = amountILS;
-    if (currency === 'USD') {
-      const ilsToUsdRate = Number(process.env.TWOCHECKOUT_ILS_TO_USD_RATE);
-      if (!Number.isFinite(ilsToUsdRate) || ilsToUsdRate <= 0) throw new PaymentGatewayError();
-      expectedAmount = Math.round(amountILS * ilsToUsdRate * 100) / 100;
+    const amountILS = Number(order.products_total) - Number(payload.discount || 0)
+      - Number(payload.loyaltyDiscount || 0) + Number(order.shipping_fee);
+    if (payment.currency !== 'ILS' || payment.amount !== Math.round(amountILS * 100)) {
+      throw new PaymentGatewayError('المبلغ المدفوع لا يطابق إجمالي الطلب.', 400);
     }
-    const result = await verifyPaymentForOrder(request.params.orderId, request.originalUrl.split('?')[1], expectedAmount, currency);
-    if (order.payment_status === 'PAID' && order.gateway_transaction_id !== result.transactionId) {
+    if (order.payment_status === 'PAID' && order.gateway_transaction_id !== payment.reference) {
       return response.status(409).json({ error: 'تم تسجيل عملية دفع أخرى لهذا الطلب.' });
     }
     if (order.payment_status !== 'PAID') {
       const { error: updateError } = await supabase.from('orders').update({
         payment_method: 'CARD',
         payment_status: 'PAID',
-        currency: result.currency,
-        gateway_transaction_id: result.transactionId,
-      }).eq('id', orderId);
+        currency: payment.currency,
+        gateway_transaction_id: payment.reference,
+      }).eq('id', order.id).eq('gateway_session_id', reference);
       if (updateError) throw updateError;
     }
     response.setHeader('Cache-Control', 'no-store');
-    response.json(result);
+    response.json({
+      paid: true,
+      orderId: Number(order.id),
+      transactionId: payment.reference,
+      currency: payment.currency,
+    });
   } catch (error) {
     if (error instanceof PaymentGatewayError) return response.status(error.status).json({ error: error.message });
     logLimitedError('payment-verify', 'Payment verification failed:', error?.name || 'Unknown error');

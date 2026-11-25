@@ -56,10 +56,10 @@ export default function Footer({ policies }: { policies: SiteContent['policies']
           <p>{language === 'en' ? 'Address: Ramallah, Palestine' : 'العنوان: فلسطين - رام الله'}</p>
         </section>
         <div className="flex flex-col items-center gap-3 text-center text-sm text-[#d4d2b5]">
-          <div className="flex items-center justify-center gap-4 border-y border-white/15 py-2" aria-label={language === 'en' ? 'Accepted payment methods: Visa, Mastercard, 2Checkout' : 'وسائل الدفع المقبولة: Visa وMasterCard و2Checkout'}>
+          <div className="flex items-center justify-center gap-4 border-y border-white/15 py-2" aria-label={language === 'en' ? 'Accepted payment methods: Visa, Mastercard, Lahza' : 'وسائل الدفع المقبولة: Visa وMasterCard وLahza'}>
             <FaCcVisa size={34} aria-label="Visa" />
             <FaCcMastercard size={30} aria-label="MasterCard" />
-            <span className="inline-flex items-center gap-1.5 font-display font-semibold text-[#f0eddf]"><CreditCard size={18} aria-hidden="true" />2Checkout</span>
+            <span className="inline-flex items-center gap-1.5 font-display font-semibold text-[#f0eddf]"><CreditCard size={18} aria-hidden="true" />Lahza</span>
           </div>
           <p>&copy; {new Date().getFullYear()} Moon Face · {t('rights')}</p>
           <p>{t('designedBy')} <span className="font-display text-base text-[#f0eddf]">Watan Creative Agency</span></p>

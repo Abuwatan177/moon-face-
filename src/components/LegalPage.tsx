@@ -13,12 +13,12 @@ const legalContent = {
       sections: [
         ['المعلومات التي نجمعها', 'قد نجمع الاسم ورقم الهاتف وعنوان التوصيل والمنطقة وتفاصيل المنتجات المطلوبة، إضافة إلى معلومات التواصل التي يختار العميل تزويدنا بها. نستخدم هذه البيانات لمعالجة الطلب والتواصل بشأنه وتسليمه.'],
         ['استخدام البيانات ومشاركتها', 'نستخدم البيانات بالقدر اللازم لتقديم خدمات المتجر وإدارة الطلبات وخدمة العملاء. لا نبيع البيانات الشخصية ولا نشاركها مع أطراف ثالثة، باستثناء شركات الشحن اللازمة لإيصال الطلب وبوابات الدفع اللازمة لمعالجة الدفع، أو إذا ألزمنا القانون بذلك.'],
-        ['مدفوعات البطاقات', 'عند إتاحة الدفع الإلكتروني، تُدخل بيانات البطاقة في صفحة الدفع المستضافة لدى 2Checkout / Verifone، وتُنقل عبر اتصال مشفر. لا يخزن Moon Face رقم البطاقة الكامل أو رمز الأمان. تخضع معالجة الدفع كذلك لسياسة مزود الدفع.'],
+        ['مدفوعات البطاقات', 'عند إتاحة الدفع الإلكتروني، تُدخل بيانات البطاقة في صفحة الدفع المستضافة لدى Lahza، وتُنقل عبر اتصال مشفر. لا يخزن Moon Face رقم البطاقة الكامل أو رمز الأمان. تخضع معالجة الدفع كذلك لسياسة مزود الدفع.'],
         ['حماية المعلومات والاحتفاظ بها', 'نتخذ تدابير إدارية وتقنية معقولة لحماية بيانات الطلبات من الوصول أو الاستخدام غير المصرح به، ونحتفظ بها للمدة اللازمة لمعالجة الطلبات والالتزامات المحاسبية والقانونية.'],
         ['حقوق العميل والتواصل', 'يمكنك طلب الاطلاع على بياناتك أو تصحيحها أو الاستفسار عن استخدامها عبر قنوات التواصل الموضحة في أسفل الصفحة، مع مراعاة ما يلزم الاحتفاظ به لتنفيذ الطلب أو بموجب القانون.'],
       ],
       englishTitle: 'Privacy Policy (English summary)',
-      english: 'Moon Face collects the name, phone number, delivery address, area, and order details needed to process and deliver purchases. Personal data is not sold or shared with third parties except delivery providers, payment providers, or where required by law. When card payments are available, card details are entered on 2Checkout / Verifone hosted checkout and transmitted over an encrypted connection; Moon Face does not store full card numbers or security codes. We use reasonable safeguards and retain order information only as needed for service and legal obligations. Contact us using the details in the footer to ask about or request correction of your information.',
+      english: 'Moon Face collects the name, phone number, delivery address, area, and order details needed to process and deliver purchases. Personal data is not sold or shared with third parties except delivery providers, payment providers, or where required by law. When card payments are available, card details are entered on Lahza hosted checkout and transmitted over an encrypted connection; Moon Face does not store full card numbers or security codes. We use reasonable safeguards and retain order information only as needed for service and legal obligations. Contact us using the details in the footer to ask about or request correction of your information.',
     },
     en: {
       title: 'Privacy Policy',
@@ -26,7 +26,7 @@ const legalContent = {
       sections: [
         ['Information we collect', 'We may collect your name, phone number, delivery address, area, order items, and any contact information you choose to provide. We use these details to process, communicate about, and deliver your order.'],
         ['Use and sharing', 'We use information only as needed to operate the store, manage orders, and provide customer service. We do not sell personal data or share it with third parties except delivery companies needed to fulfill an order, payment providers needed to process payment, or where disclosure is required by law.'],
-        ['Card payments', 'When online card payment is available, card details are entered on the 2Checkout / Verifone hosted checkout page and transmitted over an encrypted connection. Moon Face does not store full card numbers or security codes. Payment processing is also subject to the payment provider’s privacy terms.'],
+        ['Card payments', 'When online card payment is available, card details are entered on the Lahza hosted checkout page and transmitted over an encrypted connection. Moon Face does not store full card numbers or security codes. Payment processing is also subject to the payment provider’s privacy terms.'],
         ['Security and retention', 'We use reasonable administrative and technical safeguards to protect order information from unauthorized access or use. We retain it for as long as needed to fulfill orders and meet accounting or legal obligations.'],
         ['Your choices and contact', 'You may contact us using the details in the footer to ask about, access, or request correction of your information, subject to records we must retain to fulfill an order or comply with law.'],
       ],

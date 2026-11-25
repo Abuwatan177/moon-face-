@@ -4,7 +4,7 @@ import { Bell, Check, CreditCard, LoaderCircle, MessageCircle, Minus, Plus, Shop
 import AnimatedActionButton from './AnimatedActionButton';
 import StoredMedia from './StoredMedia';
 import type { Product } from '../data/products';
-import { loadCartReminderStatus, loadLoyaltyBalance, loadLoyaltyConfig, saveOrder, sendOrderToShipping, subscribeToCartReminders, validateWheelCoupon, type LoyaltyConfig } from '../lib/api';
+import { createCardPaymentSession, loadCartReminderStatus, loadLoyaltyBalance, loadLoyaltyConfig, saveOrder, sendOrderToShipping, subscribeToCartReminders, validateWheelCoupon, type LoyaltyConfig } from '../lib/api';
 import { translateProductColor, useLanguage } from '../i18n';
 import { useAuth } from '../context/AuthContext';
 
@@ -17,7 +17,8 @@ export default function CartDrawer({ open, items, sessionId, whatsappNumber, onC
   const { user } = useAuth();
   const [region, setRegion] = useState<'الضفة' | 'القدس' | 'الداخل'>('الضفة');
   const [paymentMethod, setPaymentMethod] = useState<'CASH_ON_DELIVERY' | 'CARD'>('CASH_ON_DELIVERY');
-  const [customer, setCustomer] = useState({ name: '', phone: '', address: '' });
+  const [customer, setCustomer] = useState({ name: '', phone: '', address: '', email: '' });
+  const [paymentError, setPaymentError] = useState('');
   const [orderNotice, setOrderNotice] = useState<{ number: string; token: string } | null>(null);
   const [whatsappHref, setWhatsappHref] = useState('');
   const [couponInput, setCouponInput] = useState('');
@@ -93,10 +94,13 @@ export default function CartDrawer({ open, items, sessionId, whatsappNumber, onC
   };
 
   const confirmOrder = async () => {
-    if (paymentMethod !== 'CASH_ON_DELIVERY') return false;
     if (!customer.name || !customer.phone || !customer.address || !items.length) return false;
+    if (paymentMethod === 'CARD' && customer.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email.trim())) {
+      setPaymentError(language === 'en' ? 'Enter a valid email address.' : 'يرجى إدخال بريد إلكتروني صحيح.');
+      return false;
+    }
     const whatsappDigits = whatsappNumber.replace(/\D/g, '');
-    const whatsappWindow = whatsappDigits ? window.open('about:blank', '_blank') : null;
+    const whatsappWindow = paymentMethod === 'CASH_ON_DELIVERY' && whatsappDigits ? window.open('about:blank', '_blank') : null;
     setWhatsappHref('');
     const order = {
       customer,
@@ -112,6 +116,11 @@ export default function CartDrawer({ open, items, sessionId, whatsappNumber, onC
     };
     try {
       const result = await saveOrder(order);
+      if (paymentMethod === 'CARD') {
+        const session = await createCardPaymentSession(result.orderNumber, result.trackingToken, customer.email);
+        window.location.assign(session.authorizationUrl);
+        return false;
+      }
       if (whatsappDigits) {
         const message = [
           'طلب جديد من متجر Moon Face',
@@ -136,6 +145,7 @@ export default function CartDrawer({ open, items, sessionId, whatsappNumber, onC
     } catch (error) {
       whatsappWindow?.close();
       console.error('Order submission failed:', error);
+      setPaymentError(error instanceof Error ? error.message : (language === 'en' ? 'Unable to start payment. Please try again.' : 'تعذر بدء الدفع. يرجى المحاولة مجددًا.'));
       return false;
     }
   };
@@ -175,26 +185,18 @@ export default function CartDrawer({ open, items, sessionId, whatsappNumber, onC
             <fieldset className="mt-5 space-y-2">
               <legend className="mb-2 text-sm font-bold">{language === 'en' ? 'Payment method' : 'طريقة الدفع'}</legend>
               <label className={`flex cursor-pointer items-center gap-3 rounded-lg border bg-white p-3 ${paymentMethod === 'CASH_ON_DELIVERY' ? 'border-moon-face-600 ring-1 ring-moon-face-600' : 'border-charcoal-200'}`}>
-                <input type="radio" name="payment-method" value="CASH_ON_DELIVERY" checked={paymentMethod === 'CASH_ON_DELIVERY'} onChange={() => setPaymentMethod('CASH_ON_DELIVERY')} />
+                <input type="radio" name="payment-method" value="CASH_ON_DELIVERY" checked={paymentMethod === 'CASH_ON_DELIVERY'} onChange={() => { setPaymentMethod('CASH_ON_DELIVERY'); setPaymentError(''); }} />
                 <span className="text-sm font-semibold">{language === 'en' ? 'Cash on delivery' : 'الدفع عند الاستلام'}</span>
               </label>
               <label className={`flex cursor-pointer items-center gap-3 rounded-lg border bg-white p-3 ${paymentMethod === 'CARD' ? 'border-moon-face-600 ring-1 ring-moon-face-600' : 'border-charcoal-200'}`}>
-                <input type="radio" name="payment-method" value="CARD" checked={paymentMethod === 'CARD'} onChange={() => setPaymentMethod('CARD')} />
+                <input type="radio" name="payment-method" value="CARD" checked={paymentMethod === 'CARD'} onChange={() => { setPaymentMethod('CARD'); setPaymentError(''); }} />
                 <CreditCard size={18} aria-hidden="true" />
-                <span className="text-sm font-semibold">{language === 'en' ? 'Credit / debit card' : 'الدفع عبر البطاقة'}</span>
+                <span className="text-sm font-semibold">{language === 'en' ? 'Bank card (Visa / MasterCard)' : 'الدفع الإلكتروني بالبطاقة البنكية (Visa / MasterCard)'}</span>
               </label>
               <AnimatePresence initial={false}>
                 {paymentMethod === 'CARD' && <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-                  <div role="status" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
-                    {language === 'en'
-                      ? 'Card payments are not enabled yet. No card details are collected here. Please choose cash on delivery.'
-                      : 'الدفع بالبطاقة غير متاح حاليًا. لا تُدخل بيانات البطاقة هنا. يرجى اختيار الدفع عند الاستلام.'}
-                    <p className="mt-2 text-xs">
-                      {language === 'en'
-                        ? 'When enabled, the bank-hosted fields will charge the products amount in ILS only; delivery is paid in cash on receipt.'
-                        : 'عند تفعيل الخدمة، ستُخصم قيمة المنتجات فقط (بالشيكل) عبر البطاقة، وتُدفع رسوم التوصيل نقدًا عند الاستلام.'}
-                    </p>
-                  </div>
+                  <input value={customer.email} onChange={(event) => { setCustomer({ ...customer, email: event.target.value }); setPaymentError(''); }} placeholder={language === 'en' ? 'Email (optional)' : 'البريد الإلكتروني (اختياري)'} type="email" autoComplete="email" className="field mt-2" />
+                  <p className="mt-2 text-xs text-charcoal-500">{language === 'en' ? 'Payment will be securely completed on Lahza.' : 'سيتم إتمام الدفع بأمان عبر صفحة Lahza.'}</p>
                 </motion.div>}
               </AnimatePresence>
             </fieldset>
@@ -202,7 +204,8 @@ export default function CartDrawer({ open, items, sessionId, whatsappNumber, onC
           <div className="mt-5 flex gap-2"><input value={couponInput} onChange={(event) => { setCouponInput(event.target.value); setCouponApplied(false); setCouponDiscountPercent(0); setCouponMessage(''); }} placeholder={t('couponPlaceholder')} className="field min-w-0" /><button type="button" onClick={() => void applyCoupon()} className="shrink-0 rounded-lg border border-moon-face-600 px-4 text-sm font-bold text-moon-face-800 hover:bg-moon-face-100">{t('applyCoupon')}</button></div>
           {couponMessage && <p className={`mt-2 text-sm ${couponApplied ? 'text-green-700' : 'text-red-600'}`} role="status">{couponMessage}</p>}
           <div className="mt-5 space-y-2 border-t pt-4 text-sm"><div className="flex justify-between"><span>{t('subtotal')}</span><span>₪{subtotal}</span></div>{couponApplied && <div className="flex justify-between text-green-700"><span>{t('couponDiscount')}</span><span>-₪{discount}</span></div>}{redeemedPoints > 0 && <div className="flex justify-between text-green-700"><span>{t('redeemPoints')} ({redeemedPoints})</span><span>-₪{loyaltyDiscount.toFixed(2)}</span></div>}<div className="flex justify-between text-charcoal-500"><span>{t('deliveryFee')}</span><span>₪{delivery[region]}</span></div><div className="flex justify-between border-t pt-3 text-lg font-bold"><span>{t('total')}</span><span>₪{total.toFixed(2)}</span></div></div>
-          <AnimatedActionButton disabled={paymentMethod !== 'CASH_ON_DELIVERY' || !customer.name || !customer.phone || !customer.address} onAction={confirmOrder} onSuccess={(result) => { if (typeof result === 'string') { const [number, token] = result.split(':'); if (number && token) setOrderNotice({ number, token }); } setPointsToRedeem(0); onClear(); }} icon={<ShoppingBag size={18} />} className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-[#3B2A22] py-4 font-bold text-white transition-all hover:bg-moon-face-800 disabled:opacity-40">{t('confirm')}</AnimatedActionButton>
+          {paymentError && <p role="alert" className="mt-3 text-sm text-red-700">{paymentError}</p>}
+          <AnimatedActionButton disabled={!customer.name || !customer.phone || !customer.address} onAction={confirmOrder} onSuccess={(result) => { if (typeof result === 'string') { const [number, token] = result.split(':'); if (number && token) setOrderNotice({ number, token }); } setPointsToRedeem(0); onClear(); }} icon={<ShoppingBag size={18} />} className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-[#3B2A22] py-4 font-bold text-white transition-all hover:bg-moon-face-800 disabled:opacity-40">{t('confirm')}</AnimatedActionButton>
         </div>
       </>}
     </motion.aside>
