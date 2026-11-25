@@ -96,43 +96,44 @@ export default function CartDrawer({ open, items, sessionId, whatsappNumber, onC
 
   const confirmOrder = async () => {
     if (!customer.name || !customer.phone || !customer.address || !items.length) return false;
-    if (paymentMethod === 'CARD' && customer.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email.trim())) {
-      setPaymentError(language === 'en' ? 'Enter a valid email address.' : 'يرجى إدخال بريد إلكتروني صحيح.');
-      return false;
-    }
     if (paymentMethod === 'CARD') {
       if (!window.LahzaPopup) {
         setPaymentError(language === 'en' ? 'Lahza checkout is unavailable. Please try again later.' : 'بوابة لحظة غير متاحة الآن. يرجى المحاولة لاحقًا.');
         return false;
       }
-      const reference = `MF-${Date.now()}-${crypto.randomUUID()}`;
+      const publicKey = import.meta.env.VITE_LAHZA_PUBLIC_KEY?.trim() || 'pk_test_DiEATEBLXoo1coBo0tvvc4YnF4OjgSQtD';
+      const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email.trim())
+        ? customer.email.trim()
+        : 'customer@moon-face.com';
+      const totalAmount = Number(total);
+      const amount = Math.round(Number(totalAmount) * 100);
+      if (!Number.isSafeInteger(amount) || amount <= 0) {
+        setPaymentError(language === 'en' ? 'The payment amount is invalid.' : 'قيمة الدفع غير صالحة.');
+        return false;
+      }
+      const reference = `MF-${Date.now()}`;
       setPaymentError('');
       setPaymentNotice('');
       try {
         const popup = new window.LahzaPopup();
         popup.newTransaction({
-          key: 'pk_test_DiEATEBLXoo1coBo0tvvc4YnF4OjgSQtD',
-          email: customer.email.trim() || 'customer@moon-face.com',
-          amount: Math.round(total * 100),
+          key: publicKey,
+          email: validEmail,
+          amount,
           currency: 'ILS',
           ref: reference,
-          metadata: {
-            customer_name: customer.name,
-            customer_phone: customer.phone,
-            customer_address: customer.address,
-            products: items.map((item) => ({
-              id: item.id,
-              name: item.name,
-              color: item.selectedColor,
-              quantity: item.quantity,
-              price: item.price,
-            })),
-          },
           onSuccess: (transaction) => {
             const transactionReference = transaction.reference || reference;
+            if (!publicKey.startsWith('pk_test_')) {
+              setPaymentNotice(language === 'en'
+                ? 'Lahza returned a success callback, but the live payment must be verified by a server. Your cart was kept.'
+                : 'أعادت لحظة نتيجة نجاح، لكن يجب التحقق من الدفع الحي عبر الخادم. أبقينا السلة كما هي.');
+              return;
+            }
             setPaymentNotice(language === 'en'
-              ? `Lahza reported success for reference ${transactionReference}, but the payment has not been verified by the store. No order is confirmed and your cart was kept.`
-              : `أبلغت لحظة عن نجاح العملية ${transactionReference}، لكن المتجر لم يتحقق من الدفع بعد. لم يتم تأكيد الطلب وستبقى السلة كما هي.`);
+              ? `Lahza test payment succeeded (reference ${transactionReference}). The cart was cleared for testing only; this does not confirm a live order.`
+              : `نجح الدفع التجريبي من لحظة (المرجع ${transactionReference}). أُفرغت السلة للاختبار فقط، وهذا لا يؤكد طلباً حقيقياً.`);
+            onClear();
           },
           onCancel: () => {
             setPaymentNotice(language === 'en'
@@ -214,6 +215,7 @@ export default function CartDrawer({ open, items, sessionId, whatsappNumber, onC
     <motion.aside initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 26 }} dir={language === 'en' ? 'ltr' : 'rtl'} className="fixed top-0 right-0 h-full w-full max-w-md bg-[#f6f3e8] z-[61] shadow-2xl p-5 sm:p-7 overflow-y-auto">
       <div className="flex items-center justify-between mb-6"><h2 className="text-2xl font-bold">{t('cart')}</h2><button onClick={onClose} className="p-2 rounded-full hover:bg-moon-face-100" aria-label={t('close')}><X /></button></div>
       {orderNotice && <div role="status" className="mb-5 border-r-4 border-[#5e6d49] bg-[#e8e7da] p-4"><p className="font-bold">{t('orderConfirmed')} #{orderNotice.number}</p><p className="mt-2 text-sm">{t('orderTrackingCode')}</p><code dir="ltr" className="mt-1 block select-all break-all rounded bg-white px-2 py-1 text-xs">{orderNotice.token}</code><p className="mt-2 text-sm">{t('orderTrackingHint')}</p>{whatsappHref && <a href={whatsappHref} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-2 rounded border border-[#5e6d49] px-3 py-2 text-sm font-semibold text-[#3d4b30]"><MessageCircle size={16} />{t('openWhatsApp')}</a>}</div>}
+      {paymentNotice && <p role="status" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">{paymentNotice}</p>}
       {!items.length ? <p className="text-center py-16 text-charcoal-500">{t('emptyCart')}</p> : <>
         <div className="space-y-4">{items.map((item) => <div key={item.lineId} className="flex gap-3 items-center bg-white rounded-xl p-3 shadow-sm">
           <StoredMedia type="image" source={item.image} alt={language === 'ar' ? item.nameAr : item.name} className="w-16 h-20 shrink-0 object-cover rounded-lg" />
@@ -248,7 +250,6 @@ export default function CartDrawer({ open, items, sessionId, whatsappNumber, onC
           {couponMessage && <p className={`mt-2 text-sm ${couponApplied ? 'text-green-700' : 'text-red-600'}`} role="status">{couponMessage}</p>}
           <div className="mt-5 space-y-2 border-t pt-4 text-sm"><div className="flex justify-between"><span>{t('subtotal')}</span><span>₪{subtotal}</span></div>{couponApplied && <div className="flex justify-between text-green-700"><span>{t('couponDiscount')}</span><span>-₪{discount}</span></div>}{redeemedPoints > 0 && <div className="flex justify-between text-green-700"><span>{t('redeemPoints')} ({redeemedPoints})</span><span>-₪{loyaltyDiscount.toFixed(2)}</span></div>}<div className="flex justify-between text-charcoal-500"><span>{t('deliveryFee')}</span><span>₪{delivery[region]}</span></div><div className="flex justify-between border-t pt-3 text-lg font-bold"><span>{t('total')}</span><span>₪{total.toFixed(2)}</span></div></div>
           {paymentError && <p role="alert" className="mt-3 text-sm text-red-700">{paymentError}</p>}
-          {paymentNotice && <p role="status" className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">{paymentNotice}</p>}
           <AnimatedActionButton disabled={!customer.name || !customer.phone || !customer.address} onAction={confirmOrder} onSuccess={(result) => { if (typeof result === 'string') { const [number, token] = result.split(':'); if (number && token) setOrderNotice({ number, token }); } setPointsToRedeem(0); onClear(); }} icon={<ShoppingBag size={18} />} className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-[#3B2A22] py-4 font-bold text-white transition-all hover:bg-moon-face-800 disabled:opacity-40">{t('confirm')}</AnimatedActionButton>
         </div>
       </>}

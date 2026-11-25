@@ -7,7 +7,7 @@ type LahzaPopupOptions = {
   amount: number;
   currency: 'ILS';
   ref: string;
-  metadata: {
+  metadata?: {
     customer_name: string;
     customer_phone: string;
     customer_address: string;

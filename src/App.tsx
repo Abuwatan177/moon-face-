@@ -3,7 +3,7 @@ import EditorialHero from './components/EditorialHero';
 import Collections from './components/Collections';
 import Benefits from './components/Benefits';
 import Footer from './components/Footer';
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { ShoppingBag } from 'lucide-react';
 import ProductShowcase from './components/ProductShowcase';
@@ -17,7 +17,7 @@ import SpinWheel from './components/SpinWheel';
 import type { CartItem } from './components/CartDrawer';
 import { useAuth } from './context/AuthContext';
 import { defaultProducts, type Product } from './data/products';
-import { clearAbandonedCartSession, deleteStoredMedia, loadArchivedProducts, loadProducts, loadSiteContent, saveProducts as persistProducts, saveSiteContent as persistSiteContent, trackCartSession } from './lib/api';
+import { deleteStoredMedia, loadArchivedProducts, loadProducts, loadSiteContent, saveProducts as persistProducts, saveSiteContent as persistSiteContent } from './lib/api';
 import { defaultSiteContent, type SiteContent } from './data/siteContent';
 import { normalizeProductType, useLanguage } from './i18n';
 import { playStoreSound } from './utils/storeSounds';
@@ -249,7 +249,6 @@ function StorefrontApp() {
   const { user,isGuest } = useAuth();
   const [products, setProducts] = useState<Product[]>(readInitialProducts);
   const [cart, setCart] = useState<CartItem[]>(restoreCart);
-  const hadCartItems = useRef(cart.length > 0);
   const [cartSessionId] = useState(readCartSessionId);
   const [cartOpen, setCartOpen] = useState(false);
   const [cartDrawerLoaded, setCartDrawerLoaded] = useState(false);
@@ -270,14 +269,6 @@ function StorefrontApp() {
   useEffect(() => {
     writeStored('moon-face-cart', cart);
   }, [cart]);
-  useEffect(() => {
-    if (cart.length) {
-      void trackCartSession(cartSessionId, cart.map((item) => ({ id: item.id, name: item.name, color: item.selectedColor, price: item.price, quantity: item.quantity })));
-    } else if (hadCartItems.current) {
-      void clearAbandonedCartSession(cartSessionId);
-    }
-    hadCartItems.current = cart.length > 0;
-  }, [cart, cartSessionId, user?.id]);
   useEffect(() => {
     writeStored('moon-face-wishlist', wishlist);
   }, [wishlist]);
