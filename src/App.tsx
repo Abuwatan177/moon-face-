@@ -24,7 +24,6 @@ import { playStoreSound } from './utils/storeSounds';
 import { toWebpStorageUrl } from './utils/media';
 import { getProductImageUrl, getProductImageUrls } from './utils/productImages';
 import LegalPage from './components/LegalPage';
-import PaymentResultPage from './components/PaymentResultPage';
 
 export type WishlistItem = Product & { selectedColor: string };
 
@@ -446,6 +445,5 @@ export default function App() {
   const pathname = window.location.pathname.replace(/\/+$/, '') || '/';
   if (pathname === '/privacy-policy') return <LegalPage page="privacy" />;
   if (pathname === '/terms-and-conditions') return <LegalPage page="terms" />;
-  if (pathname === '/payment/callback') return <PaymentResultPage />;
   return <StorefrontApp />;
 }

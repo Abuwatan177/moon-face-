@@ -4,7 +4,7 @@ import { Bell, Check, CreditCard, LoaderCircle, MessageCircle, Minus, Plus, Shop
 import AnimatedActionButton from './AnimatedActionButton';
 import StoredMedia from './StoredMedia';
 import type { Product } from '../data/products';
-import { createCardPaymentSession, loadCartReminderStatus, loadLoyaltyBalance, loadLoyaltyConfig, saveOrder, sendOrderToShipping, subscribeToCartReminders, validateWheelCoupon, type LoyaltyConfig } from '../lib/api';
+import { loadCartReminderStatus, loadLoyaltyBalance, loadLoyaltyConfig, saveOrder, sendOrderToShipping, subscribeToCartReminders, validateWheelCoupon, type LoyaltyConfig } from '../lib/api';
 import { translateProductColor, useLanguage } from '../i18n';
 import { useAuth } from '../context/AuthContext';
 
@@ -19,6 +19,7 @@ export default function CartDrawer({ open, items, sessionId, whatsappNumber, onC
   const [paymentMethod, setPaymentMethod] = useState<'CASH_ON_DELIVERY' | 'CARD'>('CASH_ON_DELIVERY');
   const [customer, setCustomer] = useState({ name: '', phone: '', address: '', email: '' });
   const [paymentError, setPaymentError] = useState('');
+  const [paymentNotice, setPaymentNotice] = useState('');
   const [orderNotice, setOrderNotice] = useState<{ number: string; token: string } | null>(null);
   const [whatsappHref, setWhatsappHref] = useState('');
   const [couponInput, setCouponInput] = useState('');
@@ -99,6 +100,53 @@ export default function CartDrawer({ open, items, sessionId, whatsappNumber, onC
       setPaymentError(language === 'en' ? 'Enter a valid email address.' : 'يرجى إدخال بريد إلكتروني صحيح.');
       return false;
     }
+    if (paymentMethod === 'CARD') {
+      if (!window.LahzaPopup) {
+        setPaymentError(language === 'en' ? 'Lahza checkout is unavailable. Please try again later.' : 'بوابة لحظة غير متاحة الآن. يرجى المحاولة لاحقًا.');
+        return false;
+      }
+      const reference = `MF-${Date.now()}-${crypto.randomUUID()}`;
+      setPaymentError('');
+      setPaymentNotice('');
+      try {
+        const popup = new window.LahzaPopup();
+        popup.newTransaction({
+          key: 'pk_test_DiEATEBLXoo1coBo0tvvc4YnF4OjgSQtD',
+          email: customer.email.trim() || 'customer@moon-face.com',
+          amount: Math.round(total * 100),
+          currency: 'ILS',
+          ref: reference,
+          metadata: {
+            customer_name: customer.name,
+            customer_phone: customer.phone,
+            customer_address: customer.address,
+            products: items.map((item) => ({
+              id: item.id,
+              name: item.name,
+              color: item.selectedColor,
+              quantity: item.quantity,
+              price: item.price,
+            })),
+          },
+          onSuccess: (transaction) => {
+            const transactionReference = transaction.reference || reference;
+            setPaymentNotice(language === 'en'
+              ? `Lahza reported success for reference ${transactionReference}, but the payment has not been verified by the store. No order is confirmed and your cart was kept.`
+              : `أبلغت لحظة عن نجاح العملية ${transactionReference}، لكن المتجر لم يتحقق من الدفع بعد. لم يتم تأكيد الطلب وستبقى السلة كما هي.`);
+          },
+          onCancel: () => {
+            setPaymentNotice(language === 'en'
+              ? 'The payment window was closed. No order was confirmed and your cart is still available.'
+              : 'أُغلقت نافذة الدفع. لم يتم تأكيد الطلب وما زالت سلة مشترياتك متاحة.');
+          },
+        });
+      } catch (error) {
+        console.error('Lahza popup initialization failed:', error);
+        setPaymentError(language === 'en' ? 'Could not open Lahza checkout. Please try again.' : 'تعذر فتح نافذة الدفع من لحظة. يرجى المحاولة مجددًا.');
+        return false;
+      }
+      return false;
+    }
     const whatsappDigits = whatsappNumber.replace(/\D/g, '');
     const whatsappWindow = paymentMethod === 'CASH_ON_DELIVERY' && whatsappDigits ? window.open('about:blank', '_blank') : null;
     setWhatsappHref('');
@@ -116,11 +164,6 @@ export default function CartDrawer({ open, items, sessionId, whatsappNumber, onC
     };
     try {
       const result = await saveOrder(order);
-      if (paymentMethod === 'CARD') {
-        const session = await createCardPaymentSession(result.orderNumber, result.trackingToken, customer.email);
-        window.location.assign(session.authorizationUrl);
-        return false;
-      }
       if (whatsappDigits) {
         const message = [
           'طلب جديد من متجر Moon Face',
@@ -196,7 +239,7 @@ export default function CartDrawer({ open, items, sessionId, whatsappNumber, onC
               <AnimatePresence initial={false}>
                 {paymentMethod === 'CARD' && <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
                   <input value={customer.email} onChange={(event) => { setCustomer({ ...customer, email: event.target.value }); setPaymentError(''); }} placeholder={language === 'en' ? 'Email (optional)' : 'البريد الإلكتروني (اختياري)'} type="email" autoComplete="email" className="field mt-2" />
-                  <p className="mt-2 text-xs text-charcoal-500">{language === 'en' ? 'Payment will be securely completed on Lahza.' : 'سيتم إتمام الدفع بأمان عبر صفحة Lahza.'}</p>
+                  <p className="mt-2 text-xs text-charcoal-500">{language === 'en' ? 'Test mode only: a popup success message does not confirm the order without server verification.' : 'وضع الاختبار فقط: نجاح النافذة لا يؤكد الطلب دون تحقق من الخادم.'}</p>
                 </motion.div>}
               </AnimatePresence>
             </fieldset>
@@ -205,6 +248,7 @@ export default function CartDrawer({ open, items, sessionId, whatsappNumber, onC
           {couponMessage && <p className={`mt-2 text-sm ${couponApplied ? 'text-green-700' : 'text-red-600'}`} role="status">{couponMessage}</p>}
           <div className="mt-5 space-y-2 border-t pt-4 text-sm"><div className="flex justify-between"><span>{t('subtotal')}</span><span>₪{subtotal}</span></div>{couponApplied && <div className="flex justify-between text-green-700"><span>{t('couponDiscount')}</span><span>-₪{discount}</span></div>}{redeemedPoints > 0 && <div className="flex justify-between text-green-700"><span>{t('redeemPoints')} ({redeemedPoints})</span><span>-₪{loyaltyDiscount.toFixed(2)}</span></div>}<div className="flex justify-between text-charcoal-500"><span>{t('deliveryFee')}</span><span>₪{delivery[region]}</span></div><div className="flex justify-between border-t pt-3 text-lg font-bold"><span>{t('total')}</span><span>₪{total.toFixed(2)}</span></div></div>
           {paymentError && <p role="alert" className="mt-3 text-sm text-red-700">{paymentError}</p>}
+          {paymentNotice && <p role="status" className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">{paymentNotice}</p>}
           <AnimatedActionButton disabled={!customer.name || !customer.phone || !customer.address} onAction={confirmOrder} onSuccess={(result) => { if (typeof result === 'string') { const [number, token] = result.split(':'); if (number && token) setOrderNotice({ number, token }); } setPointsToRedeem(0); onClear(); }} icon={<ShoppingBag size={18} />} className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-[#3B2A22] py-4 font-bold text-white transition-all hover:bg-moon-face-800 disabled:opacity-40">{t('confirm')}</AnimatedActionButton>
         </div>
       </>}
