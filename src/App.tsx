@@ -23,6 +23,8 @@ import { normalizeProductType, useLanguage } from './i18n';
 import { playStoreSound } from './utils/storeSounds';
 import { toWebpStorageUrl } from './utils/media';
 import { getProductImageUrl, getProductImageUrls } from './utils/productImages';
+import LegalPage from './components/LegalPage';
+import PaymentResultPage from './components/PaymentResultPage';
 
 export type WishlistItem = Product & { selectedColor: string };
 
@@ -243,7 +245,7 @@ const mergeSiteContent = (value: Partial<SiteContent> | null | undefined): SiteC
   };
 };
 
-export default function App() {
+function StorefrontApp() {
   const { language, t } = useLanguage();
   const { user,isGuest } = useAuth();
   const [products, setProducts] = useState<Product[]>(readInitialProducts);
@@ -438,4 +440,12 @@ export default function App() {
       </div>
     </div>
   );
+}
+
+export default function App() {
+  const pathname = window.location.pathname.replace(/\/+$/, '') || '/';
+  if (pathname === '/privacy-policy') return <LegalPage page="privacy" />;
+  if (pathname === '/terms-and-conditions') return <LegalPage page="terms" />;
+  if (pathname === '/payment-result') return <PaymentResultPage />;
+  return <StorefrontApp />;
 }

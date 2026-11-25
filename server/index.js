@@ -306,7 +306,44 @@ app.get('/api/push/public-key', (_request, response) => {
 
 app.post('/api/payment/create-session', async (request, response) => {
   try {
-    const session = await createPaymentSession(request.body);
+    const orderId = Number(request.body?.orderId);
+    const trackingToken = typeof request.body?.trackingToken === 'string' ? request.body.trackingToken.trim() : '';
+    if (!Number.isSafeInteger(orderId) || orderId <= 0) return response.status(400).json({ error: 'رقم الطلب غير صالح.' });
+    if (!/^[a-f\d]{64}$/i.test(trackingToken)) return response.status(404).json({ error: 'لم يتم العثور على الطلب.' });
+    const { data: order, error } = await supabase.from('orders')
+      .select('id,products_total,payload,currency,tracking_token_hash,payment_status')
+      .eq('id', orderId)
+      .maybeSingle();
+    if (error) throw error;
+    const providedTokenHash = createHash('sha256').update(trackingToken).digest();
+    const storedTokenHash = /^[a-f\d]{64}$/i.test(order?.tracking_token_hash || '')
+      ? Buffer.from(order.tracking_token_hash, 'hex')
+      : Buffer.alloc(0);
+    if (!order || storedTokenHash.length !== providedTokenHash.length || !timingSafeEqual(storedTokenHash, providedTokenHash)) {
+      return response.status(404).json({ error: 'لم يتم العثور على الطلب.' });
+    }
+    if (order.payment_status === 'PAID') return response.status(409).json({ error: 'تم دفع هذا الطلب مسبقًا.' });
+
+    const payload = order.payload && typeof order.payload === 'object' ? order.payload : {};
+    const amountILS = Number(order.products_total) - Number(payload.discount || 0) - Number(payload.loyaltyDiscount || 0);
+    if (!Number.isFinite(amountILS) || amountILS <= 0) return response.status(400).json({ error: 'قيمة المنتجات غير صالحة للدفع.' });
+    const currency = typeof request.body?.currency === 'string' ? request.body.currency.toUpperCase() : order.currency || 'ILS';
+    let productsAmount = amountILS;
+    if (currency === 'USD') {
+      const ilsToUsdRate = Number(process.env.TWOCHECKOUT_ILS_TO_USD_RATE);
+      if (!Number.isFinite(ilsToUsdRate) || ilsToUsdRate <= 0) {
+        return response.status(503).json({ error: 'لم يتم إعداد سعر التحويل إلى الدولار.' });
+      }
+      productsAmount = Math.round(amountILS * ilsToUsdRate * 100) / 100;
+    } else if (currency !== 'ILS') {
+      return response.status(400).json({ error: 'العملة غير مدعومة.' });
+    }
+
+    const session = await createPaymentSession({
+      orderId,
+      productsAmount,
+      currency,
+    });
     response.setHeader('Cache-Control', 'no-store');
     response.json(session);
   } catch (error) {
@@ -329,7 +366,36 @@ app.post('/api/payment/webhook', async (request, response) => {
 
 app.get('/api/payment/verify/:orderId', async (request, response) => {
   try {
-    const result = await verifyPaymentForOrder(request.params.orderId);
+    const orderId = Number(request.params.orderId);
+    const { data: order, error } = await supabase.from('orders')
+      .select('id,products_total,payload,currency,payment_status,gateway_transaction_id')
+      .eq('id', orderId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!order) return response.status(404).json({ error: 'لم يتم العثور على الطلب.' });
+
+    const payload = order.payload && typeof order.payload === 'object' ? order.payload : {};
+    const amountILS = Number(order.products_total) - Number(payload.discount || 0) - Number(payload.loyaltyDiscount || 0);
+    const currency = new URLSearchParams(request.originalUrl.split('?')[1] || '').get('total-currency');
+    let expectedAmount = amountILS;
+    if (currency === 'USD') {
+      const ilsToUsdRate = Number(process.env.TWOCHECKOUT_ILS_TO_USD_RATE);
+      if (!Number.isFinite(ilsToUsdRate) || ilsToUsdRate <= 0) throw new PaymentGatewayError();
+      expectedAmount = Math.round(amountILS * ilsToUsdRate * 100) / 100;
+    }
+    const result = await verifyPaymentForOrder(request.params.orderId, request.originalUrl.split('?')[1], expectedAmount, currency);
+    if (order.payment_status === 'PAID' && order.gateway_transaction_id !== result.transactionId) {
+      return response.status(409).json({ error: 'تم تسجيل عملية دفع أخرى لهذا الطلب.' });
+    }
+    if (order.payment_status !== 'PAID') {
+      const { error: updateError } = await supabase.from('orders').update({
+        payment_method: 'CARD',
+        payment_status: 'PAID',
+        currency: result.currency,
+        gateway_transaction_id: result.transactionId,
+      }).eq('id', orderId);
+      if (updateError) throw updateError;
+    }
     response.setHeader('Cache-Control', 'no-store');
     response.json(result);
   } catch (error) {

@@ -4,5 +4,11 @@
       "path": "/api/cron/abandoned-cart-reminders",
       "schedule": "0 0 * * *"
     }
+  ],
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
   ]
 }

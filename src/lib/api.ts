@@ -516,6 +516,24 @@ export async function saveOrder(order: Record<string, any>) {
   return { orderNumber, trackingToken };
 }
 
+export async function verifyCardPayment(orderId: string, query: string) {
+  const response = await fetch(`${backendUrl}/api/payment/verify/${encodeURIComponent(orderId)}?${query}`, { cache: 'no-store' });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || result.paid !== true) throw new Error(result.error || 'Unable to verify payment.');
+  return result as { paid: true; orderId: number; transactionId: string; currency: string };
+}
+
+export async function createCardPaymentSession(orderId: number, trackingToken: string, currency: 'ILS' | 'USD' = 'ILS') {
+  const response = await fetch(`${backendUrl}/api/payment/create-session`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ orderId, trackingToken, currency }),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || typeof result.checkoutUrl !== 'string') throw new Error(result.error || 'Unable to start card payment.');
+  return result as { checkoutUrl: string; orderId: number; amount: number; currency: string };
+}
+
 export async function sendOrderToShipping(order: Record<string, any>, orderNumber: number) {
   const response = await fetch(`${backendUrl}/api/shipping/orders`, {
     method: 'POST',
