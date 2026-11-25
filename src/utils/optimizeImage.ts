@@ -50,7 +50,7 @@ async function loadImage(file: File) {
     };
   } catch (error) {
     URL.revokeObjectURL(objectUrl);
-    throw new Error('تعذر فتح الصورة على هذا الجهاز. جرّب حفظها بصيغة JPG أو PNG ثم أعد رفعها.', { cause: error });
+    throw Object.assign(new Error('تعذر فتح الصورة على هذا الجهاز. جرّب حفظها بصيغة JPG أو PNG ثم أعد رفعها.'), { cause: error });
   }
 }
 
@@ -61,7 +61,7 @@ export async function optimizeImageForUpload(file: File): Promise<Blob> {
     image = await loadImage(file);
   } catch (error) {
     if (file.size > MAX_UNDECODED_IMAGE_BYTES) {
-      throw new Error('هذا الجهاز لا يستطيع فتح صيغة الصورة المحددة وحجمها كبير. احفظها بصيغة JPG أو PNG ثم أعد رفعها.', { cause: error });
+      throw Object.assign(new Error('هذا الجهاز لا يستطيع فتح صيغة الصورة المحددة وحجمها كبير. احفظها بصيغة JPG أو PNG ثم أعد رفعها.'), { cause: error });
     }
     return new Blob([file], { type: file.type || 'application/octet-stream' });
   }

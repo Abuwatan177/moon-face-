@@ -122,13 +122,13 @@ export function ProductCard({ product, index, onAdd, liked, onToggleWishlist, se
         </div>
 
         <div className="mt-3 flex w-full min-w-0 flex-wrap items-center gap-x-1.5 gap-y-2 max-[520px]:mt-2 max-[520px]:gap-x-1 max-[520px]:gap-y-1.5">
-          {colors.map((item) => {
+          {colors.map((item, index) => {
             const hasAnySizeAvailable = item.available;
             const selected = selectedColor === item.name; 
             
             return (
               <button 
-                key={item.name} 
+                key={`${item.name}-${index}`}
                 onClick={() => setSelectedColor(item.name)}
                 className={`relative shrink-0 rounded-full transition-transform hover:scale-110 ${isOffer ? 'h-4 w-4' : 'h-6 w-6'} ${selected ? `${isOffer ? 'ring-1 ring-offset-1' : 'ring-2 ring-offset-2'} ring-[#c59b52] scale-110` : 'border border-gray-200'} ${!hasAnySizeAvailable ? 'opacity-60 grayscale' : ''}`}
                 style={getProductColorStyle(item.name, item.customColor)}
@@ -398,9 +398,9 @@ function ProductDetails({ product, products, liked, onClose, onAdd, onToggleWish
           {product.description?.trim() && <p className="mt-3 whitespace-pre-line text-sm leading-7 text-charcoal-600">{product.description}</p>}
           <div className="mt-4 mb-3">
             <p className="mb-2 text-sm font-bold">{t('color')}: {translateProductColor(selectedColor, language)}</p>
-            <div className="flex flex-wrap gap-2">{colors.map((color) => {
+            <div className="flex flex-wrap gap-2">{colors.map((color, index) => {
               const available = Boolean(color.available);
-              return <button type="button" key={color.name} disabled={!available} onClick={() => setSelectedColor(color.name)} className={`grid size-11 place-items-center rounded-full border shadow-sm transition-transform hover:scale-105 disabled:opacity-40 ${selectedColor === color.name ? 'ring-2 ring-[#68704B] ring-offset-2' : 'border-charcoal-200'}`} style={getProductColorStyle(color.name, color.customColor)} aria-label={translateProductColor(color.name, language)} title={translateProductColor(color.name, language)} aria-pressed={selectedColor === color.name}><span className="sr-only">{translateProductColor(color.name, language)}</span></button>;
+              return <button type="button" key={`${color.name}-${index}`} disabled={!available} onClick={() => setSelectedColor(color.name)} className={`grid size-11 place-items-center rounded-full border shadow-sm transition-transform hover:scale-105 disabled:opacity-40 ${selectedColor === color.name ? 'ring-2 ring-[#68704B] ring-offset-2' : 'border-charcoal-200'}`} style={getProductColorStyle(color.name, color.customColor)} aria-label={translateProductColor(color.name, language)} title={translateProductColor(color.name, language)} aria-pressed={selectedColor === color.name}><span className="sr-only">{translateProductColor(color.name, language)}</span></button>;
             })}</div>
           </div>
           <div className="sticky bottom-0 z-[1] grid grid-cols-[minmax(0,1fr)_3rem_3rem] gap-2 border-t border-[#d3d4bf] bg-[#faf8f5] py-3">

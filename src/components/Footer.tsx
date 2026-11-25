@@ -3,8 +3,6 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
 import { useLanguage } from '../i18n';
 import { FaInstagram, FaTiktok, FaWhatsapp } from 'react-icons/fa6';
-import { FaCcMastercard, FaCcVisa } from 'react-icons/fa';
-import { CreditCard } from 'lucide-react';
 import type { SiteContent } from '../data/siteContent';
 
 const socialLinks = [
@@ -56,11 +54,6 @@ export default function Footer({ policies }: { policies: SiteContent['policies']
           <p>{language === 'en' ? 'Address: Ramallah, Palestine' : 'العنوان: فلسطين - رام الله'}</p>
         </section>
         <div className="flex flex-col items-center gap-3 text-center text-sm text-[#d4d2b5]">
-          <div className="flex items-center justify-center gap-4 border-y border-white/15 py-2" aria-label={language === 'en' ? 'Accepted payment methods: Visa, Mastercard, Lahza' : 'وسائل الدفع المقبولة: Visa وMasterCard وLahza'}>
-            <FaCcVisa size={34} aria-label="Visa" />
-            <FaCcMastercard size={30} aria-label="MasterCard" />
-            <span className="inline-flex items-center gap-1.5 font-display font-semibold text-[#f0eddf]"><CreditCard size={18} aria-hidden="true" />Lahza</span>
-          </div>
           <p>&copy; {new Date().getFullYear()} Moon Face · {t('rights')}</p>
           <p>{t('designedBy')} <span className="font-display text-base text-[#f0eddf]">Watan Creative Agency</span></p>
         </div>

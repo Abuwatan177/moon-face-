@@ -211,10 +211,6 @@ function writeLocal(key: string, value: unknown) {
   }
 }
 
-function createTrackingToken() {
-  return Array.from(crypto.getRandomValues(new Uint8Array(32)), (byte) => byte.toString(16).padStart(2, '0')).join('');
-}
-
 function orderFromRow(row: any): StoreOrder {
   return {
     ...row.payload,
@@ -484,58 +480,6 @@ export function getProductShareUrl(productId: number) {
   return shareUrl.href;
 }
 
-export async function saveOrder(order: Record<string, any>) {
-  if (supabase) {
-    const customer = order.customer || {};
-    const { data, error } = await supabase.rpc('create_store_order', {
-      p_payload: {
-        items: Array.isArray(order.items) ? order.items.map((item: { id: number; color: string; quantity: number }) => ({
-          id: item.id,
-          color: item.color,
-          quantity: item.quantity,
-        })) : [],
-        promoCode: String(order.promoCode || ''),
-      },
-      p_customer_name: String(customer.name || ''),
-      p_customer_phone: String(customer.phone || ''),
-      p_customer_address: String(customer.address || ''),
-      p_region: String(order.region || ''),
-      p_loyalty_points_to_redeem: Number(order.loyaltyPointsRedeemed || 0),
-    });
-    if (error) throw error;
-    if (Number(order.loyaltyPointsRedeemed) > 0) invalidateReadCachePrefix('loyalty-balance:');
-    invalidateOrderCaches();
-    const result = Array.isArray(data) ? data[0] : data;
-    return { orderNumber: Number(result.order_number), trackingToken: String(result.tracking_token) };
-  }
-
-  const orders = readLocal<Record<string, any>[]>('moon-face-orders', []);
-  const orderNumber = Date.now();
-  const trackingToken = createTrackingToken();
-  writeLocal('moon-face-orders', [...orders, { ...order, id: orderNumber, trackingToken, status: 'new', createdAt: new Date().toISOString() }]);
-  return { orderNumber, trackingToken };
-}
-
-export async function sendOrderToShipping(order: Record<string, any>, orderNumber: number) {
-  const response = await fetch(`${backendUrl}/api/shipping/orders`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      orderNumber,
-      customer: order.customer,
-      region: order.region,
-      total: order.total,
-      items: order.items,
-      product_note: order.product_note || '',
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => '');
-    throw new Error(`Casper shipping request failed (${response.status})${errorText ? `: ${errorText}` : ''}.`);
-  }
-}
-
 async function backendHeaders(sessionId: string) {
   const session = supabase ? (await supabase.auth.getSession()).data.session : null;
   return {
@@ -573,23 +517,6 @@ export async function subscribeToCartReminders(sessionId: string) {
     }
     throw err instanceof Error ? err : new Error(errorMessage);
   }
-}export async function loadCartReminderStatus(sessionId: string) {
-  return cachedRead(`cart-reminder-status:${sessionId}`, async () => {
-    try {
-      const response = await fetch(`${backendUrl}/api/cart-reminders/status`, {
-        headers: await backendHeaders(sessionId),
-      });
-      if (!response.ok) {
-        if (response.status >= 500 || response.status === 404) return false;
-        throw new Error('تعذر التحقق من حالة تذكير السلة.');
-      }
-      const result = await response.json() as { enabled?: boolean };
-      return result.enabled === true;
-    } catch (error) {
-      if (isBackendUnavailableError(error)) return false;
-      throw error;
-    }
-  });
 }
 
 export async function sendAdminBroadcastNotification(title: string, message: string) {
